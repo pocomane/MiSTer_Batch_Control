@@ -20,4 +20,4 @@ install:
   - echo "nothing to do"
 
 script:
-  - sh .travis.sh
+  - sh build.sh
