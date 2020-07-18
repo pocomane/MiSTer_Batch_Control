@@ -46,6 +46,7 @@ static int ev_open() {
   memset(&uud, 0, sizeof(uud));
   snprintf(uud.name, UINPUT_MAX_NAME_SIZE, DEVICE_NAME);
   write(fd, &uud, sizeof(uud));
+#error MiSTer needs UINPUT 5 or above
 #else
   struct uinput_setup usetup;
   memset(&usetup, 0, sizeof(usetup));
@@ -61,11 +62,11 @@ static int ev_open() {
 }
 
 static void ev_emit(int fd, int type, int code, int val) {
-  struct input_event ie;
+  struct input_event ie = {0,};
   ie.type = type;
   ie.code = code;
   ie.value = val;
-  gettimeofday(&ie.time, NULL);
+  //gettimeofday(&ie.time, NULL);
   write(fd, &ie, sizeof(ie));
 }
 

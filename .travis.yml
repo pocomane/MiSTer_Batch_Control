@@ -9,7 +9,7 @@ deploy:
   provider: releases
   api_key: $GITHUB_API_KEY
   file_glob: true
-  file: "mbc"
+  file: "build/mbc"
   skip_cleanup: true
 
 branches:
@@ -17,8 +17,7 @@ branches:
     - master
 
 install:
-  - sudo apt-get install gcc-arm-linux-gnueabihf
-  - sudo apt-get install g++-arm-linux-gnueabihf
+  - echo "nothing to do"
 
 script:
   - sh .travis.sh
