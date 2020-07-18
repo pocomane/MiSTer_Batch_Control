@@ -146,7 +146,7 @@ static system_t system_list[] = {
   //{ "ZZZZTESTING", "/media/data/temp/zzzztesting/~~~.rom", "EEMOFO", }, // Testing purpose
 };
 
-static int emulate_key(int fd, int key) {
+static void emulate_key(int fd, int key) {
   msleep(50);
   ev_emit(fd, EV_KEY, key, 1);
   ev_emit(fd, EV_SYN, SYN_REPORT, 0);
@@ -194,7 +194,6 @@ static int emulate_sequence(char* seq) {
 }
 
 static char* after_string(char* str, char delim) {
-  char* curr = str;
   for (char* curr = str; '\0' != *curr; curr += 1){
     if (delim == *curr) {
       str = curr+1;
@@ -299,23 +298,25 @@ static int load_rom(system_t* sys, char* rom) {
 
   int ret = rom_link(sys, rom);
   if (0 > ret) {
-    PRINTERR("Can not bind the rom\n", "");
+    PRINTERR("%s\n", "Can not bind the rom");
     rom_unlink(sys);
     return -1;
   }
 
   ret = emulate_system_sequence(sys);
   if (0 > ret) {
-    PRINTERR("Error during key emulation\n", "");
+    PRINTERR("%s\n", "Error during key emulation");
     rom_unlink(sys);
     return -1;
   }
 
   ret = rom_unlink(sys);
   if (0 > ret) {
-    PRINTERR("Can not unbind the rom\n", "");
+    PRINTERR("%s\n", "Can not unbind the rom");
     return -1;
   }
+
+  return 0;
 }
 
 static int load_core_and_rom(system_t* sys, char* corepath, char* rom) {
@@ -326,7 +327,7 @@ static int load_core_and_rom(system_t* sys, char* corepath, char* rom) {
 
   int ret = load_core(sys, corepath);
   if (0 > ret) {
-    PRINTERR("Can not load the core\n", "");
+    PRINTERR("%s\n", "Can not load the core");
     return -1;
   }
 
@@ -444,7 +445,7 @@ static int stream_mode() {
   return 0;
 }
 
-static int print_help(char* name) {
+static void print_help(char* name) {
   printf("Usage:\n");
   printf("  %s COMMAND [ARGS]\n", name);
   printf("\n");
