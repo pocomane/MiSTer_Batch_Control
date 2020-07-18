@@ -17,10 +17,9 @@ curl "$DOWNLOAD_GCC_TOOLCHAIN" --output cc_toolchain.tar.gz ||die
 tar -xzf cc_toolchain.tar.gz ||die
 cd ..
 
-
 echo "building..."
 cd build
-arm-linux-musleabihf-gcc -O2 -o mbc ../mbc.c ||die
+arm-linux-musleabihf-gcc -static -O2 -o mbc ../mbc.c ||die
 arm-linux-musleabihf-strip mbc ||die
 cd ..
 
