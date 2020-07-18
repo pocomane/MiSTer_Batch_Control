@@ -1,0 +1,24 @@
+language: c
+
+matrix:
+  include:
+    - os: linux
+      env: TARGET="linux"
+
+deploy:
+  provider: releases
+  api_key: $GITHUB_API_KEY
+  file_glob: true
+  file: "mbc"
+  skip_cleanup: true
+
+branches:
+  only:
+    - master
+
+install:
+  - sudo apt-get install gcc-arm-linux-gnueabihf
+  - sudo apt-get install g++-arm-linux-gnueabihf
+
+script:
+  - sh .travis.sh
