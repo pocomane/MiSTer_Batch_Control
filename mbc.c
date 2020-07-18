@@ -12,6 +12,7 @@
 #include <sys/mount.h>
 #include <linux/uinput.h>
 
+#define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
 
@@ -28,7 +29,6 @@ static void msleep(long ms){
 }
 
 static int ev_open() {
-  struct uinput_setup usetup;
 
   int fd = open(DEVICE_PATH, O_WRONLY | O_NONBLOCK);
   if (fd < 0) {
@@ -41,14 +41,21 @@ static int ev_open() {
     ioctl(fd, UI_SET_KEYBIT, i);
   }
 
+#if UINPUT_VERSION < 5
+  struct uinput_user_dev uud;
+  memset(&uud, 0, sizeof(uud));
+  snprintf(uud.name, UINPUT_MAX_NAME_SIZE, DEVICE_NAME);
+  write(fd, &uud, sizeof(uud));
+#else
+  struct uinput_setup usetup;
   memset(&usetup, 0, sizeof(usetup));
   usetup.id.bustype = BUS_USB;
   usetup.id.vendor = 0x1234; /* fake vendor */
   usetup.id.product = 0x5678; /* fake product */
-  strcpy(usetup.name, "Fake device");
-
+  strcpy(usetup.name, DEVICE_NAME);
   ioctl(fd, UI_DEV_SETUP, &usetup);
   ioctl(fd, UI_DEV_CREATE);
+#endif
 
   return fd;
 }
