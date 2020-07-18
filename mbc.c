@@ -291,7 +291,7 @@ static int emulate_system_sequence(system_t* sys) {
   if (NULL == sys) {
     return -1;
   }
-  return emulate_sequence(sys->menuseq);
+  return emulate_sequence(sys->menuseq ? sys->menuseq : default_menuseq);
 }
 
 static int load_rom(system_t* sys, char* rom) {
