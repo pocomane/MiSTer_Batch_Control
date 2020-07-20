@@ -163,12 +163,11 @@ static int emulate_sequence(char* seq) {
     return -1;
   }
 
-  /* Wait that userspace detects the new device */
+  // Wait that userspace detects the new device
   sleep(1);
 
+  // Emulate sequence
   for (int i=0; i<strlen(seq); i++) {
-    if (0 != i) msleep(50);
-
     switch (seq[i]) {
       default:
         close(fd);
@@ -186,7 +185,7 @@ static int emulate_sequence(char* seq) {
     }
   }
 
-  /* Wait that userspace detects all the events */
+  // Wait that userspace detects all the events
   sleep(1);
 
   ev_close(fd);
