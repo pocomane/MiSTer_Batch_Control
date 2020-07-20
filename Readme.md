@@ -51,6 +51,34 @@ mbc load_all /PATH/TO/CORE /PATH/TO/ROM
 This is similar to the `load_all_as` command, but it tries to match the system
 from the core file name.
 
+## Command raw_seq
+
+```
+mbc raw_seq KEY_SEQUENCE
+```
+
+This command will emulate the key press and release as described in the
+`KEY_SEQUENCE`. It must be an uppercase string containig just the following
+characters:
+
+- U - Up arrow
+- D - Down arrow
+- L - Left arrow
+- R - Right arrow
+- O - Enter (Open)
+- E - ESC
+- H - Home
+- F - End (Finish)
+- M - F12 (Menu)
+
+For example, the command
+
+```
+mbc raw_seq MDDO
+```
+
+sends F12, down, dowm, enter, so it selects the third item of the menu.
+
 ## Command stream
 
 ```
