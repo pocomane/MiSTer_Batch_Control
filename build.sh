@@ -10,12 +10,12 @@ die(){
 export DOWNLOAD_GCC_TOOLCHAIN="http://musl.cc/arm-linux-musleabihf-cross.tgz"
 export PATH="$PWD/build/arm-linux-musleabihf-cross/bin:$PATH"
 
-# echo "downloading $DOWNLOAD_GCC_TOOLCHAIN"
-# mkdir -p build ||die
-# cd build
-# curl "$DOWNLOAD_GCC_TOOLCHAIN" --output cc_toolchain.tar.gz ||die
-# tar -xzf cc_toolchain.tar.gz ||die
-# cd ..
+echo "downloading $DOWNLOAD_GCC_TOOLCHAIN"
+mkdir -p build ||die
+cd build
+curl "$DOWNLOAD_GCC_TOOLCHAIN" --output cc_toolchain.tar.gz ||die
+tar -xzf cc_toolchain.tar.gz ||die
+cd ..
 
 echo "building..."
 cd build
