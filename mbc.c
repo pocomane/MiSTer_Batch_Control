@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -77,8 +78,8 @@ static int ev_close(int fd) {
 }
 
 typedef struct {
-  char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE .
-  char *romdir;  // Must be give explicitely at the command line
+  char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
+  char *romdir;  // Must be give explicitely at the command line. It must be LOWERCASE .
   char *romext;  // Valid extension for rom filename; searched in the internal DB
   char *menuseq; // Sequence of input for the rom selection; searched in the internal DB (NULL -> default_menuseq will be used)
 } system_t;
@@ -144,7 +145,7 @@ static system_t system_list[] = {
   //{ "MultiComp"      , 0, 0, 0, },
   //{ "X68000"         , 0, 0, 0, },
 
-  { "ZZZZTESTING", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
+  //{ "ZZZZTESTING", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
 };
 
 static void emulate_key(int fd, int key) {
@@ -360,6 +361,41 @@ int checkarg(int min, int val){
   return 0;
 }
 
+int list_content(){
+  for (int i=0; i<ARRSIZ(system_list); i++){
+    DIR *dp;
+    struct dirent *ep;
+    int something_found = 0;
+
+    int elen = strlen(system_list[i].romext);
+    dp = opendir(system_list[i].romdir);
+    if (dp != NULL) {
+      while (0 != (ep = readdir (dp))){
+
+        char* ext = after_string(ep->d_name, '.');
+        if (elen == strlen(ext)){
+          int match = 1;
+          for (int e = 0; e < elen; e += 1){
+            if (tolower(ext[e]) != system_list[i].romext[e]) {
+              match = 0;
+              break;
+            }
+          }
+          if (match){
+            something_found = 1;
+            printf("%s %s/%s\n", system_list[i].id, system_list[i].romdir, ep->d_name);
+          }
+        }
+      }
+      closedir(dp);
+    }
+    // if (!something_found) {
+    //   printf("#%s no '.%s' files found in %s\n", system_list[i].id, system_list[i].romext, system_list[i].romdir);
+    // }
+  }
+  return 0;
+}
+
 static int stream_mode();
 
 // command list
@@ -374,6 +410,7 @@ static void cmd_rom_link(int argc, char** argv)     { if(checkarg(2,argc))rom_li
 static void cmd_raw_seq(int argc, char** argv)      { if(checkarg(1,argc))emulate_sequence(argv[1]); }
 static void cmd_select_seq(int argc, char** argv)   { if(checkarg(1,argc))emulate_system_sequence(get_system(NULL,argv[1])); }
 static void cmd_rom_unlink(int argc, char** argv)   { if(checkarg(1,argc))rom_unlink(get_system(NULL,argv[1])); }
+static void cmd_list_content(int argc, char** argv)   { list_content(); }
 //
 struct cmdentry cmdlist[] = {
   //
@@ -382,6 +419,7 @@ struct cmdentry cmdlist[] = {
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
   //
   {"done"         , cmd_exit         , } ,
+  {"list_content" , cmd_list_content , } ,
   {"load_all"     , cmd_load_all     , } ,
   {"load_all_as"  , cmd_load_all_as  , } ,
   {"load_core"    , cmd_load_core    , } ,

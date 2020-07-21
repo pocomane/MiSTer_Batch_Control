@@ -79,6 +79,18 @@ mbc raw_seq MDDO
 
 sends F12, down, dowm, enter, so it selects the third item of the menu.
 
+## Command list_content
+
+```
+mbc list_content
+```
+
+It will scann MiSTer directory searching for rom files. It will return a list
+of all the roms found, preceded by the system name and a space. The system name
+is upper case and has no spaces. The supported systems can be retrieved running
+`mbc` without arguments.
+
+
 ## Command stream
 
 ```
