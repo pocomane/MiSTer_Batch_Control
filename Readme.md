@@ -31,16 +31,24 @@ mbc COMMAND [ARG1 [ARG2 [...]]]
 
 Please refer to the documentation of the single commands.
 
+## Command list_core
+
+```
+mbc list_core
+```
+
+This will list all the supported systems. The list will contain the `SYSTEM` id
+and the path of the default core.
+
 ## Command list_content
 
 ```
 mbc list_content
 ```
 
-It will scann MiSTer directory searching for rom files. It will return a list
-of all the roms found, preceded by the system name and a space. The system name
-is upper case and has no spaces. The supported systems can be retrieved running
-`mbc` without arguments.
+It will list all the rom in the default MiSTer directories. Each rome is
+preceded by the system name and a space. The system name is upper case and has
+no spaces.
 
 ## Command load_rom
 
@@ -49,8 +57,8 @@ mbc load_rom SYSTEM /PATH/TO/ROM
 ```
 
 This will load the default core associated to the `SYSTEM`, then it will load
-the rom passed as argument. The supported systems can be retrieved running
-`mbc` without arguments.
+the rom passed as argument. The supported systems can be retrieved with the
+`list_core` command.
 
 ## Command load_all_as
 

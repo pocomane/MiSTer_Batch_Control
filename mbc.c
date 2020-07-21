@@ -571,17 +571,8 @@ static void print_help(char* name) {
   printf("Usage:\n");
   printf("  %s COMMAND [ARGS]\n", name);
   printf("\n");
-  printf("Some command have argumentd, e.g.:\n");
-  printf("  %s load_all SYSTEM CORE_PATH ROM_PATH\n", name);
-  printf("\n");
-  printf("CORE_PATH is the absolute path to the core fpga file (.rbf)\n");
-  printf("ROM_PATH is the absolute path to the rom file\n");
-  printf("\n");
-  printf("Supported SYSTEM:");
-  for (int i=0; i<ARRSIZ(system_list); i++){
-    if (0 != i) printf(",");
-    printf(" %s", system_list[i].id);
-  }
+  printf("E.g.:\n");
+  printf("  %s load_rom NES /media/fat/NES/*.nes\n", name);
   printf("\n");
   printf("Supported COMMAND:");
   for (int i=0; i<ARRSIZ(cmdlist); i++){
@@ -589,6 +580,8 @@ static void print_help(char* name) {
     printf(" %s", cmdlist[i].name);
   }
   printf("\n");
+  printf("\n");
+  printf("Please refer to the Readme for further infromation: https://github.com/pocomane/MiSTer_Batch_Control\n");
 }
 
 int main(int argc, char* argv[]) {
