@@ -31,16 +31,35 @@ mbc COMMAND [ARG1 [ARG2 [...]]]
 
 Please refer to the documentation of the single commands.
 
+## Command list_content
+
+```
+mbc list_content
+```
+
+It will scann MiSTer directory searching for rom files. It will return a list
+of all the roms found, preceded by the system name and a space. The system name
+is upper case and has no spaces. The supported systems can be retrieved running
+`mbc` without arguments.
+
+## Command load_rom
+
+```
+mbc load_rom SYSTEM /PATH/TO/ROM
+```
+
+This will load the default core associated to the `SYSTEM`, then it will load
+the rom passed as argument. The supported systems can be retrieved running
+`mbc` without arguments.
+
 ## Command load_all_as
 
 ```
 mbc load_all_as SYSTEM /PATH/TO/CORE /PATH/TO/ROM
 ```
 
-This will load the core and the rom. The `SYSTEM` parameter is needed to match
-MiSTer specific directories in an internal database. The supported systems can
-be retrieved running `mbc` without arguments.
-
+This is similar to `load_rom` but it will use the core provaided as argument
+instead of the default one.
 
 ## Command load_all
 
@@ -78,18 +97,6 @@ mbc raw_seq MDDO
 ```
 
 sends F12, down, dowm, enter, so it selects the third item of the menu.
-
-## Command list_content
-
-```
-mbc list_content
-```
-
-It will scann MiSTer directory searching for rom files. It will return a list
-of all the roms found, preceded by the system name and a space. The system name
-is upper case and has no spaces. The supported systems can be retrieved running
-`mbc` without arguments.
-
 
 ## Command stream
 

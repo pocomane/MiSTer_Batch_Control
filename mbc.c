@@ -17,6 +17,7 @@
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
 #define AUX_ROM_NAME "~~~"
+#define CORE_EXT "rbf"
 
 #define ARRSIZ(A) (sizeof(A)/sizeof(A[0]))
 #define LOG(F,...) printf("%d - " F, __LINE__, __VA_ARGS__ )
@@ -79,6 +80,7 @@ static int ev_close(int fd) {
 
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
+  char *core;    // Path prefix to the core; searched in the internal DB
   char *romdir;  // Must be give explicitely at the command line. It must be LOWERCASE .
   char *romext;  // Valid extension for rom filename; searched in the internal DB
   char *menuseq; // Sequence of input for the rom selection; searched in the internal DB (NULL -> default_menuseq will be used)
@@ -90,62 +92,62 @@ static system_t system_list[] = {
   // The array must be lexicographically sorted wrt the first field (e.g.
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
-  { "ATARI2600"    , "/media/fat/games/Astrocade" , "rom" , NULL      , } ,
-  { "GAMEBOY"      , "/media/fat/GameBoy"         , "gbc" , NULL      , } ,
-  { "GBA"          , "/media/fat/GBA"             , "gba" , NULL      , } ,
-  { "GENESIS"      , "/media/fat/Genesis"         , "gen" , NULL      , } ,
-  { "NES"          , "/media/fat/NES"             , "nes" , "EEMOFO"  , } ,
-  { "NES.FDSBIOS"  , "/media/fat/NES"             , "nes" , "EEMDOFO" , } ,
-  { "SMS"          , "/media/fat/SMS"             , "sms" , NULL      , } ,
-  { "SNES"         , "/media/fat/SNES"            , "sfc" , NULL      , } ,
-  { "TGFX16.SGX"   , "/media/fat/games/TGFX16"    , "sgx" , "EEMDOFO" , } ,
-  { "TURBOGRAFX16" , "/media/fat/games/TGFX16"    , "pce" , NULL      , } ,
+  { "ATARI2600"    , "/media/fat/_Console/Atari2600_"    , "/media/fat/games/Astrocade" , "rom" , NULL      , } ,
+  { "GAMEBOY"      , "/media/fat/_Console/Gameboy_"      , "/media/fat/GameBoy"         , "gbc" , NULL      , } ,
+  { "GBA"          , "/media/fat/_Console/GBA_"          , "/media/fat/GBA"             , "gba" , NULL      , } ,
+  { "GENESIS"      , "/media/fat/_Console/Genesis_"      , "/media/fat/Genesis"         , "gen" , NULL      , } ,
+  { "NES"          , "/media/fat/_Console/NES_"          , "/media/fat/NES"             , "nes" , "EEMOFO"  , } ,
+  { "NES.FDSBIOS"  , "/media/fat/_Console/NES_"          , "/media/fat/NES"             , "nes" , "EEMDOFO" , } ,
+  { "SMS"          , "/media/fat/_Console/SMS_"          , "/media/fat/SMS"             , "sms" , NULL      , } ,
+  { "SNES"         , "/media/fat/_Console/SNES_"         , "/media/fat/SNES"            , "sfc" , NULL      , } ,
+  { "TGFX16.SGX"   , "/media/fat/_Console/TurboGrafx16_" , "/media/fat/games/TGFX16"    , "sgx" , "EEMDOFO" , } ,
+  { "TURBOGRAFX16" , "/media/fat/_Console/TurboGrafx16_" , "/media/fat/games/TGFX16"    , "pce" , NULL      , } ,
 
-  // { "ACUARIUS.CAQ"   , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "AO486.C"        , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "AO486.D"        , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "ARCHIE.1"       , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "ATARI800.CART"  , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "ATARI800.D2"    , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "AMSTRAD.B"      , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "C16.CART"       , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "C16.DISK"       , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "C16.PRG"        , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "C16.PLAY"       , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
-  // { "C16.TAPE"       , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "C64.CART"       , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "C64.PLAY"       , "/mnt" , "rom" , "EEMDDDDOFO"  , } ,
-  // { "C64.TAPE"       , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
-  // { "COCO_3.1"       , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "COCO_3.2"       , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "COCO_3.3"       , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
-  // { "COLECO.SG"      , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "MACPLUS.2"      , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "MACPLUS.VHD"    , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "MEGACD.BIOS"    , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "NK0011M.A"      , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "NK0011M.B"      , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "NK0011M.H"      , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
-  // { "SAMCOUPE.2"     , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "SPMX.DDI"       , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "SPECTRUM.TAPE"  , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "TI-00_4A.D"     , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "TI-00_4A.G"     , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "VECTOR06.A"     , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "VECTOR06.B"     , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "VIC20.CT"       , "/mnt" , "rom" , "EEMDDOFO"    , } ,
-  // { "VIC20.CART"     , "/mnt" , "rom" , "EEMDOFO"     , } ,
-  // { "VIC20.DISK"     , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
-  // { "VIC20.PLAY"     , "/mnt" , "rom" , "EEMDDDDDOFO" , } ,
-  // { "VIC20.TAPE"     , "/mnt" , "rom" , "EEMDDDDOFO"  , } ,
-  // { "ZSPECTRUM.TAPE" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "ACUARIUS.CAQ"   , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "AO486.C"        , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "AO486.D"        , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "ARCHIE.1"       , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "ATARI800.CART"  , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "ATARI800.D2"    , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "AMSTRAD.B"      , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "C16.CART"       , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "C16.DISK"       , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "C16.PRG"        , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "C16.PLAY"       , "/core" , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
+  // { "C16.TAPE"       , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "C64.CART"       , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "C64.PLAY"       , "/core" , "/mnt" , "rom" , "EEMDDDDOFO"  , } ,
+  // { "C64.TAPE"       , "/core" , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
+  // { "COCO_3.1"       , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "COCO_3.2"       , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "COCO_3.3"       , "/core" , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
+  // { "COLECO.SG"      , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "MACPLUS.2"      , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "MACPLUS.VHD"    , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "MEGACD.BIOS"    , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "NK0011M.A"      , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "NK0011M.B"      , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "NK0011M.H"      , "/core" , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
+  // { "SAMCOUPE.2"     , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "SPMX.DDI"       , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "SPECTRUM.TAPE"  , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "TI-00_4A.D"     , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "TI-00_4A.G"     , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "VECTOR06.A"     , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "VECTOR06.B"     , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "VIC20.CT"       , "/core" , "/mnt" , "rom" , "EEMDDOFO"    , } ,
+  // { "VIC20.CART"     , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
+  // { "VIC20.DISK"     , "/core" , "/mnt" , "rom" , "EEMDDDOFO"   , } ,
+  // { "VIC20.PLAY"     , "/core" , "/mnt" , "rom" , "EEMDDDDDOFO" , } ,
+  // { "VIC20.TAPE"     , "/core" , "/mnt" , "rom" , "EEMDDDDOFO"  , } ,
+  // { "ZSPECTRUM.TAPE" , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
 
   // unsupported
-  //{ "Altair8800"     , 0, 0, 0, },
-  //{ "MultiComp"      , 0, 0, 0, },
-  //{ "X68000"         , 0, 0, 0, },
+  //{ "Altair8800"     , 0 , 0, 0, 0, },
+  //{ "MultiComp"      , 0 , 0, 0, 0, },
+  //{ "X68000"         , 0 , 0, 0, 0, },
 
-  //{ "ZZZZTESTING", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
+  { "ZZZZTESTING", "/media/data/temp/aaa_", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
 };
 
 static void emulate_key(int fd, int key) {
@@ -333,6 +335,81 @@ static int load_rom(system_t* sys, char* rom) {
   return 0;
 }
 
+static int has_ext(char* name, char* ext){
+  char* name_ext = after_string(name, '.');
+  if (name_ext == name) return 0;
+  while (1) {
+    if (tolower(*ext) != tolower(*name_ext)) return 0;
+    if (*name_ext != '\0') break;
+    ext += 1;
+    name_ext += 1;
+  }
+  return 1;
+}
+
+static int resolve_core_path(char* path, char* out, int len){
+  strncpy(out, path, len);
+  char* name = after_string(out, '/');
+  if (*name == '\0' || name - out < 3) {
+    return -1;
+  }
+  name[-1] = '\0';
+  int matched = 0;
+  struct dirent* ep = NULL;
+  DIR* dp = opendir(out);
+  if (dp != NULL) {
+    int nlen = strlen(name);
+    while (0 != (ep = readdir (dp))){
+      if (!strncmp(name, ep->d_name, nlen) && has_ext(ep->d_name, CORE_EXT)){
+        matched = 1;
+        snprintf(out+strlen(out), len-strlen(out)-1, "/%s", ep->d_name);
+        break;
+      }
+    }
+  }
+  if (!matched) {
+    return -1;
+  }
+  return 0;
+}
+
+static int list_core(){
+  for (int i=0; i<ARRSIZ(system_list); i++){
+    int plen = 64 + strlen(system_list[i].core);
+    char corepath[plen];
+    if (0 != resolve_core_path(system_list[i].core, corepath, plen)){
+      printf("#%s can not be found with prefix %s\n", system_list[i].id, system_list[i].core);
+    } else {
+      printf("%s %s\n", system_list[i].id, corepath);
+    }
+  }
+}
+
+static int load_rom_autocore(system_t* sys, char* rom) {
+
+  if (NULL == sys) {
+    return -1;
+  }
+
+  int plen = 64 + strlen(sys->core);
+  char corepath[plen];
+
+  if (resolve_core_path(sys->core, corepath, plen)){
+    PRINTERR("Can not find the core at %s\n", sys->core);
+    return -1;
+  }
+
+  int ret = load_core(sys, corepath);
+  if (0 > ret) {
+    PRINTERR("%s\n", "Can not load the core");
+    return -1;
+  }
+
+  sleep(3);
+
+  return load_rom(sys, rom);
+}
+
 static int load_core_and_rom(system_t* sys, char* corepath, char* rom) {
 
   if (NULL == sys) {
@@ -372,19 +449,9 @@ int list_content(){
     if (dp != NULL) {
       while (0 != (ep = readdir (dp))){
 
-        char* ext = after_string(ep->d_name, '.');
-        if (elen == strlen(ext)){
-          int match = 1;
-          for (int e = 0; e < elen; e += 1){
-            if (tolower(ext[e]) != system_list[i].romext[e]) {
-              match = 0;
-              break;
-            }
-          }
-          if (match){
-            something_found = 1;
-            printf("%s %s/%s\n", system_list[i].id, system_list[i].romdir, ep->d_name);
-          }
+        if (has_ext(ep->d_name, system_list[i].romext)){
+          something_found = 1;
+          printf("%s %s/%s\n", system_list[i].id, system_list[i].romdir, ep->d_name);
         }
       }
       closedir(dp);
@@ -404,6 +471,8 @@ static void cmd_stream_mode(int argc, char** argv)  { stream_mode(); }
 static void cmd_load_core(int argc, char** argv)    { if(checkarg(1,argc))load_core(get_system(argv[1],NULL),argv[1]); }
 static void cmd_load_core_as(int argc, char** argv) { if(checkarg(2,argc))load_core(get_system(NULL,argv[1]),argv[2]); }
 static void cmd_load_rom(int argc, char** argv)     { if(checkarg(2,argc))load_rom(get_system(NULL,argv[1]),argv[2]); }
+static void cmd_list_core(int argc, char** argv)    { list_core(); }
+static void cmd_rom_autocore(int argc, char** argv) { if(checkarg(2,argc))load_rom_autocore(get_system(NULL,argv[1]),argv[2]); }
 static void cmd_load_all(int argc, char** argv)     { if(checkarg(2,argc))load_core_and_rom(get_system(argv[1],NULL),argv[1],argv[2]); }
 static void cmd_load_all_as(int argc, char** argv)  { if(checkarg(3,argc))load_core_and_rom(get_system(NULL,argv[1]),argv[2],argv[3]); }
 static void cmd_rom_link(int argc, char** argv)     { if(checkarg(2,argc))rom_link(get_system(NULL,argv[1]),argv[2]); }
@@ -420,11 +489,13 @@ struct cmdentry cmdlist[] = {
   //
   {"done"         , cmd_exit         , } ,
   {"list_content" , cmd_list_content , } ,
+  {"list_core"    , cmd_list_core    , } ,
   {"load_all"     , cmd_load_all     , } ,
   {"load_all_as"  , cmd_load_all_as  , } ,
   {"load_core"    , cmd_load_core    , } ,
   {"load_core_as" , cmd_load_core_as , } ,
-  {"load_rom"     , cmd_load_rom     , } ,
+  {"load_rom"     , cmd_rom_autocore , } ,
+  {"load_rom_only", cmd_load_rom     , } ,
   {"raw_seq"      , cmd_raw_seq      , } ,
   {"rom_link"     , cmd_rom_link     , } ,
   {"rom_unlink"   , cmd_rom_unlink   , } ,
