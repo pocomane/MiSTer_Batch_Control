@@ -147,7 +147,7 @@ static system_t system_list[] = {
   //{ "MultiComp"      , 0 , 0, 0, 0, },
   //{ "X68000"         , 0 , 0, 0, 0, },
 
-  { "ZZZZTESTING", "/media/data/temp/aaa_", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
+  //{ "ZZZZTESTING", "/media/data/temp/aaa_", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
 };
 
 static void emulate_key(int fd, int key) {
@@ -438,27 +438,32 @@ int checkarg(int min, int val){
   return 0;
 }
 
+int list_content_for(system_t* sys){
+  DIR *dp;
+  struct dirent *ep;
+  int something_found = 0;
+
+  int elen = strlen(sys->romext);
+  dp = opendir(sys->romdir);
+  if (dp != NULL) {
+    while (0 != (ep = readdir (dp))){
+
+      if (has_ext(ep->d_name, sys->romext)){
+        something_found = 1;
+        printf("%s %s/%s\n", sys->id, sys->romdir, ep->d_name);
+      }
+    }
+    closedir(dp);
+  }
+  if (!something_found) {
+    //printf("#%s no '.%s' files found in %s\n", sys->id, sys->romext, sys->romdir);
+  }
+  return something_found;
+}
+
 int list_content(){
   for (int i=0; i<ARRSIZ(system_list); i++){
-    DIR *dp;
-    struct dirent *ep;
-    int something_found = 0;
-
-    int elen = strlen(system_list[i].romext);
-    dp = opendir(system_list[i].romdir);
-    if (dp != NULL) {
-      while (0 != (ep = readdir (dp))){
-
-        if (has_ext(ep->d_name, system_list[i].romext)){
-          something_found = 1;
-          printf("%s %s/%s\n", system_list[i].id, system_list[i].romdir, ep->d_name);
-        }
-      }
-      closedir(dp);
-    }
-    // if (!something_found) {
-    //   printf("#%s no '.%s' files found in %s\n", system_list[i].id, system_list[i].romext, system_list[i].romdir);
-    // }
+    list_content_for(system_list+i);
   }
   return 0;
 }
@@ -479,7 +484,8 @@ static void cmd_rom_link(int argc, char** argv)     { if(checkarg(2,argc))rom_li
 static void cmd_raw_seq(int argc, char** argv)      { if(checkarg(1,argc))emulate_sequence(argv[1]); }
 static void cmd_select_seq(int argc, char** argv)   { if(checkarg(1,argc))emulate_system_sequence(get_system(NULL,argv[1])); }
 static void cmd_rom_unlink(int argc, char** argv)   { if(checkarg(1,argc))rom_unlink(get_system(NULL,argv[1])); }
-static void cmd_list_content(int argc, char** argv)   { list_content(); }
+static void cmd_list_content(int argc, char** argv) { list_content(); }
+static void cmd_list_rom_for(int argc, char** argv) { if(checkarg(1,argc))list_content_for(get_system(NULL,argv[1])); }
 //
 struct cmdentry cmdlist[] = {
   //
@@ -490,6 +496,7 @@ struct cmdentry cmdlist[] = {
   {"done"         , cmd_exit         , } ,
   {"list_content" , cmd_list_content , } ,
   {"list_core"    , cmd_list_core    , } ,
+  {"list_rom_for" , cmd_list_rom_for , } ,
   {"load_all"     , cmd_load_all     , } ,
   {"load_all_as"  , cmd_load_all_as  , } ,
   {"load_core"    , cmd_load_core    , } ,
@@ -518,7 +525,7 @@ static int run_command(int narg, char** args) {
 
   // call the command
   if (NULL == command || NULL == command->cmd) {
-    PRINTERR("%s", "unknown command");
+    PRINTERR("%s\n", "unknown command");
     return -1;
   }
   command->cmd(narg, args);
