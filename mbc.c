@@ -92,16 +92,16 @@ static system_t system_list[] = {
   // The array must be lexicographically sorted wrt the first field (e.g.
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
-  { "ATARI2600"    , "/media/fat/_Console/Atari2600_"    , "/media/fat/games/Astrocade" , "rom" , NULL      , } ,
-  { "GAMEBOY"      , "/media/fat/_Console/Gameboy_"      , "/media/fat/GameBoy"         , "gbc" , NULL      , } ,
-  { "GBA"          , "/media/fat/_Console/GBA_"          , "/media/fat/GBA"             , "gba" , NULL      , } ,
-  { "GENESIS"      , "/media/fat/_Console/Genesis_"      , "/media/fat/Genesis"         , "gen" , NULL      , } ,
-  { "NES"          , "/media/fat/_Console/NES_"          , "/media/fat/NES"             , "nes" , "EEMOFO"  , } ,
-  { "NES.FDSBIOS"  , "/media/fat/_Console/NES_"          , "/media/fat/NES"             , "nes" , "EEMDOFO" , } ,
-  { "SMS"          , "/media/fat/_Console/SMS_"          , "/media/fat/SMS"             , "sms" , NULL      , } ,
-  { "SNES"         , "/media/fat/_Console/SNES_"         , "/media/fat/SNES"            , "sfc" , NULL      , } ,
-  { "TGFX16.SGX"   , "/media/fat/_Console/TurboGrafx16_" , "/media/fat/games/TGFX16"    , "sgx" , "EEMDOFO" , } ,
-  { "TURBOGRAFX16" , "/media/fat/_Console/TurboGrafx16_" , "/media/fat/games/TGFX16"    , "pce" , NULL      , } ,
+  { "ATARI2600"    , "/media/fat/_Console/Atari2600_"    , "/media/fat/games/Astrocade"    , "rom" , NULL      , } ,
+  { "GAMEBOY"      , "/media/fat/_Console/Gameboy_"      , "/media/fat/games/GameBoy"      , "gbc" , NULL      , } ,
+  { "GBA"          , "/media/fat/_Console/GBA_"          , "/media/fat/games/GBA"          , "gba" , NULL      , } ,
+  { "GENESIS"      , "/media/fat/_Console/Genesis_"      , "/media/fat/games/Genesis"      , "gen" , NULL      , } ,
+  { "NES"          , "/media/fat/_Console/NES_"          , "/media/fat/games/NES"          , "nes" , "EEMOFO"  , } ,
+  { "NES.FDSBIOS"  , "/media/fat/_Console/NES_"          , "/media/fat/games/NES"          , "nes" , "EEMDOFO" , } ,
+  { "SMS"          , "/media/fat/_Console/SMS_"          , "/media/fat/games/SMS"          , "sms" , NULL      , } ,
+  { "SNES"         , "/media/fat/_Console/SNES_"         , "/media/fat/games/SNES"         , "sfc" , NULL      , } ,
+  { "TGFX16.SGX"   , "/media/fat/_Console/TurboGrafx16_" , "/media/fat/games/games/TGFX16" , "sgx" , "EEMDOFO" , } ,
+  { "TURBOGRAFX16" , "/media/fat/_Console/TurboGrafx16_" , "/media/fat/games/games/TGFX16" , "pce" , NULL      , } ,
 
   // { "ACUARIUS.CAQ"   , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,
   // { "AO486.C"        , "/core" , "/mnt" , "rom" , "EEMDOFO"     , } ,

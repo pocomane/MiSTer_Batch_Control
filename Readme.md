@@ -40,6 +40,9 @@ mbc list_core
 This will list all the supported systems. The list will contain the `SYSTEM` id
 and the path of the default core.
 
+Note - Only the following systems are supported for now: ATARI2600, GAMEBOY, GBA,
+GENESIS, NES (cart and disk), SMS, SNES, TURBOGRAFX (and SGX).
+
 ## Command list_content
 
 ```
