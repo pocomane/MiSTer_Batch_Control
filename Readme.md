@@ -7,8 +7,8 @@ since this features is not supported by the MiSTer out of the box.
 
 # Core supports
   
-The following core are supported for now: ATARI2600 GAMEBOY GBA GENESIS NES
-NES.FDSBIOS SMS SNES TGFX16.SGX TURBOGRAFX16.
+Only the following systems are supported for now: ATARI2600, GAMEBOY, GBA,
+GENESIS, NES (cart and disk), SMS, SNES, TURBOGRAFX (and SGX).
 
 Specific information must be added to support each core, so if you are interested
 in some other core, you can open an issue specifying:
@@ -64,9 +64,6 @@ mbc list_core
 
 This will list all the supported systems. The list will contain the `SYSTEM` id
 and the path of the default core.
-
-Note - Only the following systems are supported for now: ATARI2600, GAMEBOY, GBA,
-GENESIS, NES (cart and disk), SMS, SNES, TURBOGRAFX (and SGX).
 
 ## Command list_content
 
