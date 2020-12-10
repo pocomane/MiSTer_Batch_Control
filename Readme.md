@@ -6,19 +6,19 @@ fpga](https://github.com/MiSTer-devel)). It main purpose is to load ROM files
 since this features is not supported by the MiSTer out of the box.
 
 # Core supports
+  
+Specific information must be added to support each core, so if a core you are
+interested in is not already supported, please open an issue specifying:
 
-Each core must be specifically supported. If a core you are interested in is
-not already supported, please open an issue with the following information:
-
-- The key sequence needed to select the last rom from the menu, e.g. F12,
-  Left, Enter, End, Enter
-- Extension of the rom files, e.g. "nes"
-- Path of the default rom directory, e.g. "/media/fat/games/NES"
-- Suffix of the path of the core file, e.g. "/media/fat/_Console/NES_"
-- An easy-to-remember name, e.g. "NES"
+- The key sequence needed to select the last rom from the menu, e.g. `F12,
+  Left, Enter, End, Enter`
+- Extension of the rom files, e.g. `nes`
+- Path of the default rom directory, e.g. `/media/fat/games/NES`
+- Suffix of the path of the core file, e.g. `/media/fat/_Console/NES_`
+- An easy-to-remember name, e.g. `NES`
 
 Please note that these informations could change from one release of the MiSTer
-to another, so please, make sure you are refering to the last release. If a core
+to another, so please, make sure you are referring to the last release. If a core
 stops to work after an update, open a issue with the same information: probably
 I just did not update them yet.
 
