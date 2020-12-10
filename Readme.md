@@ -1,14 +1,17 @@
 
 # MiSTer Batch control
 
-This is a simple command line application to control the [MiSTer
+This is a simple command line utility to control the [MiSTer
 fpga](https://github.com/MiSTer-devel)). It main purpose is to load ROM files
 since this features is not supported by the MiSTer out of the box.
 
 # Core supports
   
-Specific information must be added to support each core, so if a core you are
-interested in is not already supported, please open an issue specifying:
+The following core are supported for now: ATARI2600 GAMEBOY GBA GENESIS NES
+NES.FDSBIOS SMS SNES TGFX16.SGX TURBOGRAFX16.
+
+Specific information must be added to support each core, so if you are interested
+in some other core, you can open an issue specifying:
 
 - The key sequence needed to select the last rom from the menu, e.g. `F12,
   Left, Enter, End, Enter`
@@ -18,14 +21,14 @@ interested in is not already supported, please open an issue specifying:
 - An easy-to-remember name, e.g. `NES`
 
 Please note that these informations could change from one release of the MiSTer
-to another, so please, make sure you are referring to the last release. If a core
-stops to work after an update, open a issue with the same information: probably
-I just did not update them yet.
+to another, so please, make sure you are referring to the last release. If the
+utility stops to work after an update for some specific core, you can open an
+issue with the same information: probably I just did not update them yet.
 
 If you want to make the change by yourself (e.g. to support an old release of
-the MiSTer), a single line of code for each core must be added in the
-system_list variable definition. It just contains the same informationi
-previosly described.
+the MiSTer), a single line of code for each core must be added/changed in the
+definition of the `system_list` variable. It just contains the same
+informations previosly described.
 
 # Build
 
