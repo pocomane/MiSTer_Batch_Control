@@ -93,7 +93,7 @@ static system_t system_list[] = {
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
   { "ATARI2600"    , "/media/fat/_Console/Atari2600_"    , "/media/fat/games/Astrocade"    , "rom" , NULL      , } ,
-  { "CUSTOM"       , "/media/fat/_Console/NES_"          , "/media/fat/games/NES"          , "nes" , NUKK      , } ,
+  { "CUSTOM"       , "/media/fat/_Console/NES_"          , "/media/fat/games/NES"          , "nes" , NULL      , } ,
   { "GAMEBOY"      , "/media/fat/_Console/Gameboy_"      , "/media/fat/games/GameBoy"      , "gbc" , NULL      , } ,
   { "GBA"          , "/media/fat/_Console/GBA_"          , "/media/fat/games/GBA"          , "gba" , NULL      , } ,
   { "GENESIS"      , "/media/fat/_Console/Genesis_"      , "/media/fat/games/Genesis"      , "gen" , NULL      , } ,
