@@ -10,8 +10,8 @@ since this features is not supported by the MiSTer out of the box.
 Only the following systems are supported for now: ATARI2600, GAMEBOY, GBA,
 GENESIS, NES (cart and disk), SMS, SNES, TURBOGRAFX (and SGX).
 
-For other cores you can use the `CUSTOM` which can be configured by the
-following environment variables:
+For other cores you can use the special system "CUSTOM" which can be configured
+by the following environment variables:
 
 - `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the menu and select
   the last rom; it must be specified in the same format of the `raw_seq`
@@ -26,7 +26,7 @@ following environment variables:
 - `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
   `MBC_CUSTOM_ROM_EXT=nes`
 
-If you want that the support for a particular core will be add, please open a
+If you want that a particular core is directly supported, please open a
 github issue specifying the value of such variables that makes the core work.
 
 Please note that these informations could change from one release of the MiSTer
