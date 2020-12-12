@@ -93,6 +93,7 @@ static system_t system_list[] = {
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
   { "ATARI2600"    , "/media/fat/_Console/Atari2600_"    , "/media/fat/games/Astrocade"    , "rom" , NULL      , } ,
+  { "CUSTOM"       , "/media/fat/_Console/NES_"          , "/media/fat/games/NES"          , "nes" , NUKK      , } ,
   { "GAMEBOY"      , "/media/fat/_Console/Gameboy_"      , "/media/fat/games/GameBoy"      , "gbc" , NULL      , } ,
   { "GBA"          , "/media/fat/_Console/GBA_"          , "/media/fat/games/GBA"          , "gba" , NULL      , } ,
   { "GENESIS"      , "/media/fat/_Console/Genesis_"      , "/media/fat/games/Genesis"      , "gen" , NULL      , } ,
@@ -574,6 +575,26 @@ static int stream_mode() {
   return 0;
 }
 
+static void read_options(int argc, char* argv[]) {
+
+  system_t* custom_system = get_system(NULL, "CUSTOM");
+  if (NULL == custom_system){
+    printf("no CUSTOM system record: CUSTOM can not be used\n");
+  } else {
+    char* val;
+
+    // Note: no need to free the duplicated string since they last until the end of the run
+    val = getenv("MBC_CUSTOM_CORE");
+    if (NULL != val && val[0] != '\0') custom_system->core = strdup(val);
+    val = getenv("MBC_CUSTOM_ROM_PATH");
+    if (NULL != val && val[0] != '\0') custom_system->romdir = strdup(val);
+    val = getenv("MBC_CUSTOM_ROM_EXT");
+    if (NULL != val && val[0] != '\0') custom_system->romext = strdup(val);
+    val = getenv("MBC_CUSTOM_SEQUENCE");
+    if (NULL != val && val[0] != '\0') custom_system->menuseq = strdup(val);
+  }
+}
+
 static void print_help(char* name) {
   printf("Usage:\n");
   printf("  %s COMMAND [ARGS]\n", name);
@@ -597,6 +618,8 @@ int main(int argc, char* argv[]) {
     print_help(argv[0]);
     return 0;
   }
+
+  read_options(argc, argv);
     
   return run_command(argc-1, argv+1);
 }

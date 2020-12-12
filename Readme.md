@@ -10,15 +10,24 @@ since this features is not supported by the MiSTer out of the box.
 Only the following systems are supported for now: ATARI2600, GAMEBOY, GBA,
 GENESIS, NES (cart and disk), SMS, SNES, TURBOGRAFX (and SGX).
 
-Specific information must be added to support each core, so if you are interested
-in some other core, you can open an issue specifying:
+For other cores you can use the `CUSTOM` which can be configured by the
+following environment variables:
 
-- The key sequence needed to select the last rom from the menu, e.g. `F12,
-  Left, Enter, End, Enter`
-- Extension of the rom files, e.g. `nes`
-- Path of the default rom directory, e.g. `/media/fat/games/NES`
-- Suffix of the path of the core file, e.g. `/media/fat/_Console/NES_`
-- An easy-to-remember name, e.g. `NES`
+- `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the menu and select
+  the last rom; it must be specified in the same format of the `raw_seq`
+  command. e.g. `MBC_CUSTOM_SEQUENCE=EEMODO`
+
+- `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file, e.g.
+  `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
+
+- `MBC_CUSTOM_ROM_PATH` is the path of the default rom
+  directory, e.g. `MBC_CUSTOM_ROM_PATH=/media/fat/games/NES`
+
+- `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
+  `MBC_CUSTOM_ROM_EXT=nes`
+
+If you want that the support for a particular core will be add, please open a
+github issue specifying the value of such variables that makes the core work.
 
 Please note that these informations could change from one release of the MiSTer
 to another, so please, make sure you are referring to the last release. If the
@@ -56,53 +65,6 @@ mbc COMMAND [ARG1 [ARG2 [...]]]
 
 Please refer to the documentation of the single commands.
 
-## Command list_core
-
-```
-mbc list_core
-```
-
-This will list all the supported systems. The list will contain the `SYSTEM` id
-and the path of the default core.
-
-## Command list_content
-
-```
-mbc list_content
-```
-
-It will list all the rom in the default MiSTer directories. Each rome is
-preceded by the system name and a space. The system name is upper case and has
-no spaces.
-
-## Command load_rom
-
-```
-mbc load_rom SYSTEM /PATH/TO/ROM
-```
-
-This will load the default core associated to the `SYSTEM`, then it will load
-the rom passed as argument. The supported systems can be retrieved with the
-`list_core` command.
-
-## Command load_all_as
-
-```
-mbc load_all_as SYSTEM /PATH/TO/CORE /PATH/TO/ROM
-```
-
-This is similar to `load_rom` but it will use the core provaided as argument
-instead of the default one.
-
-## Command load_all
-
-```
-mbc load_all /PATH/TO/CORE /PATH/TO/ROM
-```
-
-This is similar to the `load_all_as` command, but it tries to match the system
-from the core file name.
-
 ## Command raw_seq
 
 ```
@@ -130,6 +92,56 @@ mbc raw_seq MDDO
 ```
 
 sends F12, down, dowm, enter, so it selects the third item of the menu.
+
+
+## Command list_core
+
+```
+mbc list_core
+```
+
+Some commands need specific support for each cores. The `list_core` command
+will list all the supported systems. The list will contain the `SYSTEM` id and
+the path of the default core.
+
+## Command load_rom
+
+```
+mbc load_rom SYSTEM /PATH/TO/ROM
+```
+
+This will load the default core associated to the `SYSTEM`, then it will load
+the rom passed as argument. The supported systems can be retrieved with the
+`list_core` command.
+
+
+## Command list_content
+
+```
+mbc list_content
+```
+
+It will list all the rom in the default MiSTer directories. Each rome is
+preceded by the system name and a space. The system name is upper case and has
+no spaces.
+
+## Command load_all_as
+
+```
+mbc load_all_as SYSTEM /PATH/TO/CORE /PATH/TO/ROM
+```
+
+This is similar to `load_rom` but it will use the core provaided as argument
+instead of the default one.
+
+## Command load_all
+
+```
+mbc load_all /PATH/TO/CORE /PATH/TO/ROM
+```
+
+This is similar to the `load_all_as` command, but it tries to match the system
+from the core file name.
 
 ## Command stream
 
