@@ -63,7 +63,8 @@ action on the MiSTer, `mbc` must be run like:
 mbc COMMAND [ARG1 [ARG2 [...]]]
 ```
 
-Please refer to the documentation of the single commands.
+The main commands are `raw_seq` and `load_rom`, but other usefull ones are
+provided too. Please refer to the documentation of the single commands.
 
 ## Command raw_seq
 
@@ -88,10 +89,21 @@ characters:
 For example, the command
 
 ```
-mbc raw_seq MDDO
+mbc raw_seq EEMDDO
 ```
 
-sends F12, down, dowm, enter, so it selects the third item of the menu.
+sends Esc, Esc, F12, down, dowm, enter, so it selects the third item of the
+menu. The timing can be configured by means of the following environment
+variables:
+
+- `MBC_CORE_WAIT` sets the number of milliseconds to wait for the core to be loaded;
+  the default is 3000.
+
+- `MBC_KEY_WAIT` sets the number of milliseconds to wait between each key-press;
+  the default is 50.
+
+- `MBC_SEQUENCE_WAIT` sets the number of milliseconds to wait before and after a key
+  sequence; the default is 1000.
 
 
 ## Command list_core

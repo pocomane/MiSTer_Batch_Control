@@ -151,8 +151,12 @@ static system_t system_list[] = {
   //{ "ZZZZTESTING", "/media/data/temp/aaa_", "/media/data/temp/zzzztesting", "rom", "EEMOFO", }, // Testing purpose
 };
 
+int core_wait = 3000; // ms
+int inter_key_wait = 50; // ms
+int sequence_wait = 1000; // ms
+
 static void emulate_key(int fd, int key) {
-  msleep(50);
+  msleep(inter_key_wait);
   ev_emit(fd, EV_KEY, key, 1);
   ev_emit(fd, EV_SYN, SYN_REPORT, 0);
   msleep(50);
@@ -168,7 +172,7 @@ static int emulate_sequence(char* seq) {
   }
 
   // Wait that userspace detects the new device
-  sleep(1);
+  msleep(sequence_wait);
 
   // Emulate sequence
   for (int i=0; i<strlen(seq); i++) {
@@ -190,7 +194,7 @@ static int emulate_sequence(char* seq) {
   }
 
   // Wait that userspace detects all the events
-  sleep(1);
+  msleep(sequence_wait);
 
   ev_close(fd);
 
@@ -406,7 +410,7 @@ static int load_rom_autocore(system_t* sys, char* rom) {
     return -1;
   }
 
-  sleep(3);
+  msleep(core_wait);
 
   return load_rom(sys, rom);
 }
@@ -423,7 +427,7 @@ static int load_core_and_rom(system_t* sys, char* corepath, char* rom) {
     return -1;
   }
 
-  sleep(3);
+  msleep(core_wait);
 
   return load_rom(sys, rom);
 }
@@ -577,11 +581,12 @@ static int stream_mode() {
 
 static void read_options(int argc, char* argv[]) {
 
+  char* val;
+
   system_t* custom_system = get_system(NULL, "CUSTOM");
   if (NULL == custom_system){
     printf("no CUSTOM system record: CUSTOM can not be used\n");
   } else {
-    char* val;
 
     // Note: no need to free the duplicated string since they last until the end of the run
     val = getenv("MBC_CUSTOM_CORE");
@@ -592,6 +597,36 @@ static void read_options(int argc, char* argv[]) {
     if (NULL != val && val[0] != '\0') custom_system->romext = strdup(val);
     val = getenv("MBC_CUSTOM_SEQUENCE");
     if (NULL != val && val[0] != '\0') custom_system->menuseq = strdup(val);
+  }
+
+  val = getenv("MBC_CORE_WAIT");
+  if (NULL != val && val[0] != '\0') {
+    int i;
+    if (1 == sscanf(val, "%d", &i)) {
+      core_wait = i;
+    } else {
+      printf("invalid core wait option from environment; fallling back to %d ms\n", core_wait);
+    }
+  }
+
+  val = getenv("MBC_KEY_WAIT");
+  if (NULL != val && val[0] != '\0') {
+    int i;
+    if (1 == sscanf(val, "%d", &i)) {
+      inter_key_wait = i;
+    } else {
+      printf("invalid key wait option from environment; fallling back to %d ms\n", inter_key_wait);
+    }
+  }
+
+  val = getenv("MBC_SEQUENCE_WAIT");
+  if (NULL != val && val[0] != '\0') {
+    int i;
+    if (1 == sscanf(val, "%d", &i)) {
+      sequence_wait = i;
+    } else {
+      printf("invalid sequence wait option from environment; fallling back to %d ms\n", sequence_wait);
+    }
   }
 }
 
