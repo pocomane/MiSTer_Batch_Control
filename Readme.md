@@ -5,40 +5,6 @@ This is a simple command line utility to control the [MiSTer
 fpga](https://github.com/MiSTer-devel)). It main purpose is to load ROM files
 since this features is not supported by the MiSTer out of the box.
 
-# Core supports
-  
-Only the following systems are supported for now: ATARI2600, GAMEBOY, GBA,
-GENESIS, NES (cart and disk), SMS, SNES, TURBOGRAFX (and SGX).
-
-For other cores you can use the special system "CUSTOM" which can be configured
-by the following environment variables:
-
-- `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the menu and select
-  the last rom; it must be specified in the same format of the `raw_seq`
-  command. e.g. `MBC_CUSTOM_SEQUENCE=EEMODO`
-
-- `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file, e.g.
-  `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
-
-- `MBC_CUSTOM_ROM_PATH` is the path of the default rom
-  directory, e.g. `MBC_CUSTOM_ROM_PATH=/media/fat/games/NES`
-
-- `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
-  `MBC_CUSTOM_ROM_EXT=nes`
-
-If you want that a particular core is directly supported, please open a
-github issue specifying the value of such variables that makes the core work.
-
-Please note that these informations could change from one release of the MiSTer
-to another, so please, make sure you are referring to the last release. If the
-utility stops to work after an update for some specific core, you can open an
-issue with the same information: probably I just did not update them yet.
-
-If you want to make the change by yourself (e.g. to support an old release of
-the MiSTer), a single line of code for each core must be added/changed in the
-definition of the `system_list` variable. It just contains the same
-informations previosly described.
-
 # Build
 
 The build should be straightforward:
@@ -54,6 +20,20 @@ Moreover, the `build.sh` will download the [gcc/musl crosscompile
 toolchain](http://musl.cc), and it will compile a static version of the
 application.
 
+Some functionalities need specific support for each cores. If you want that a
+particular core is directly supported, please open a github issue specifying
+the value of variables described int the `list_core` command in this Readme.
+
+Please note that these informations could change from one release of the MiSTer
+to another, so please, make sure you are referring to the last release. If the
+utility stops to work after an update for some specific core, you can open an
+issue with the same information: probably I just did not update them yet.
+
+If you want to make the change by yourself (e.g. to support an old release of
+the MiSTer), a single line of code for each core must be added/changed in the
+definition of the `system_list` variable. It just contains the same
+informations described in `list_core`.
+
 # Usage
 
 Running the `mbc` without arguments will give minimal help. To actually perform som
@@ -64,7 +44,12 @@ mbc COMMAND [ARG1 [ARG2 [...]]]
 ```
 
 The main commands are `raw_seq` and `load_rom`, but other usefull ones are
-provided too. Please refer to the documentation of the single commands.
+provided too. Please refer to the documentation of the single commands in this
+Readme.
+
+Some commands need specific support for each cores. A special system `CUSTOM`
+is provided to try to launch unsupported core. See documentation of the `list_core`
+for more details.
 
 ## Command raw_seq
 
@@ -112,9 +97,22 @@ variables:
 mbc list_core
 ```
 
-Some commands need specific support for each cores. The `list_core` command
-will list all the supported systems. The list will contain the `SYSTEM` id and
-the path of the default core.
+The `list_core` command lists the systems. The list will contain the `SYSTEM` id and
+the path of the default core. The special system `CUSTOM` can be by mean of the
+following environment variables:
+
+- `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the menu and select
+  the last rom; it must be specified in the same format of the `raw_seq`
+  command. e.g. `MBC_CUSTOM_SEQUENCE=EEMODO`
+
+- `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file, e.g.
+  `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
+
+- `MBC_CUSTOM_ROM_PATH` is the path of the default rom
+  directory, e.g. `MBC_CUSTOM_ROM_PATH=/media/fat/games/NES`
+
+- `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
+  `MBC_CUSTOM_ROM_EXT=nes`
 
 ## Command load_rom
 
