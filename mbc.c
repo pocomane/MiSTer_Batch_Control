@@ -78,6 +78,49 @@ static int ev_close(int fd) {
   return close(fd);
 }
 
+static int mkparent(char *path, mode_t mode) {
+  int depth = 0;
+  char *curr = path, *found = 0;
+
+  while (0 != (found = strchr(curr, '/'))) {
+    if (found != curr) { // skip root or double slashes in path
+      depth += 1;
+
+      *found = '\0';
+      int created = !mkdir(path, mode);
+      int already_exist = (errno == EEXIST);
+      *found = '/';
+
+      // no error if a directory already exist
+      if (!created && !already_exist) {
+        return -depth;
+      } else {
+        if (already_exist) {
+          struct stat st;
+          *found = '\0';
+          int stat_error = stat(path, &st);
+          *found = '/';
+          if (stat_error) return -depth;
+          if (!S_ISDIR(st.st_mode)) {
+            return -depth;
+          }
+        }
+      }
+
+    }
+    curr = found + 1;
+  }
+  return 0;
+}
+
+static int mkparent_dup(const char *path, mode_t mode) {
+  char *pathdup = strdup(path);
+  if (!pathdup) return -1;
+  int status = mkparent(pathdup, mode);
+  free(pathdup);
+  return status;
+}
+
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
   char *menuseq; // Sequence of input for the rom selection; searched in the internal DB
@@ -339,6 +382,8 @@ static int rom_unlink(system_t* sys) {
 }
 
 static int rom_link(system_t* sys, char* path) {
+
+  // if (mkparent_dup(path, 0777) < 0) return -1;
 
   char rompath[4096] = {0};
   get_aux_rom_path(sys, rompath, sizeof(rompath));
