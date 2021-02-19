@@ -5,20 +5,25 @@ This is a simple command line utility to control the [MiSTer
 fpga](https://github.com/MiSTer-devel)). It main purpose is to load ROM files
 since this features is not supported by the MiSTer out of the box.
 
-# Build
+# Installation
 
-The build should be straightforward:
+A simple script to install this utility, among with others, is in
+[MiSTer_Misc](https://github.com/pocomane/MiSTer_misc/) repository. Alternatively
+you can find pre-compiled binaries in the [release
+page](https://github.com/pocomane/MiSTer_Batch_Control/releases/latest).
+
+If you make some changes to the code, you can use the `build.sh` script to
+download the [gcc/musl crosscompile toolchain](http://musl.cc), and to compile
+a static version of the application. However, also a simple command like:
 
 ```
 arm-linux-gnueabihf-gcc -O2 -o mbc mbc.c
 ```
 
-However you can find pre-compiled binaries in the [release
-page](https://github.com/pocomane/MiSTer_Batch_Control/releases).
+should be able to compile the utility, since it does not have any dependency
+(except standard C library and linux interface).
 
-Moreover, the `build.sh` will download the [gcc/musl crosscompile
-toolchain](http://musl.cc), and it will compile a static version of the
-application.
+# Support
 
 Some functionalities need specific support for each cores. If you want that a
 particular core is directly supported, please open a github issue specifying
@@ -36,8 +41,8 @@ informations described in `list_core`.
 
 # Usage
 
-Running the `mbc` without arguments will give minimal help. To actually perform som
-action on the MiSTer, `mbc` must be run like:
+Running the `mbc` without arguments will give minimal help. To actually perform
+some action on the MiSTer, `mbc` must be run like:
 
 ```
 mbc COMMAND [ARG1 [ARG2 [...]]]
