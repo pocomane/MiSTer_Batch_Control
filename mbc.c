@@ -190,7 +190,7 @@ static system_t system_list[] = {
   { "MACPLUS.VHD",    "EEMDOFO",       "/media/fat/_Computer/MacPlus_",           "/media/fat/games/MACPLUS",      "dsk", },
   { "MEGACD",         "EEMOFO",        "/media/fat/_Console/MegaCD_",             "/media/fat/games/MegaCD",       "cue", },
   { "MSX",            "EEMOFO",        "/media/fat/_Computer/MSX_",               "/media/fat/games/MSX",          "vhd", },
-  { "NEOGEO",         "EEMOFO",        "/media/fat/_Console/NeoGeo_",             "/media/fat/games/NeoGeo",       "rom", },
+  { "NEOGEO",         "EEMOFO",        "/media/fat/_Console/NeoGeo_",             "/media/fat/games/NeoGeo",       "neo", },
   { "NES",            "EEMOFO",        "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
   { "NES.FDSBIOS",    "EEMDOFO",       "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
   { "ODYSSEY2",       "EEMOFO",        "/media/fat/_Console/Odyssey2_",           "/media/fat/games/ODYSSEY2",     "bin", },
