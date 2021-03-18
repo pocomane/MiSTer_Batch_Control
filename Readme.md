@@ -2,7 +2,7 @@
 # MiSTer Batch control
 
 This is a simple command line utility to control the [MiSTer
-fpga](https://github.com/MiSTer-devel)). It main purpose is to load ROM files
+fpga](https://github.com/MiSTer-devel). It main purpose is to load ROM files
 since this features is not supported by the MiSTer out of the box.
 
 # Installation
@@ -103,8 +103,8 @@ mbc list_core
 ```
 
 The `list_core` command lists the systems. The list will contain the `SYSTEM` id and
-the path of the default core. The special system `CUSTOM` can be by mean of the
-following environment variables:
+the path of the default core. The special system `CUSTOM` can be customized by mean
+of the following environment variables:
 
 - `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the menu and select
   the last rom; it must be specified in the same format of the `raw_seq`
