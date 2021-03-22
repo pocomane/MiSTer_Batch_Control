@@ -21,7 +21,7 @@ fi
 
 echo "building..."
 cd build
-arm-linux-musleabihf-gcc -static -O2 -o mbc ../mbc.c ||die
+arm-linux-musleabihf-gcc -std=c99 -D_XOPEN_SOURCE=700 -static -O2 -o mbc ../mbc.c ||die
 arm-linux-musleabihf-strip mbc ||die
 cd ..
 

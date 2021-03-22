@@ -17,7 +17,7 @@ download the [gcc/musl crosscompile toolchain](http://musl.cc), and to compile
 a static version of the application. However, also a simple command like:
 
 ```
-arm-linux-gnueabihf-gcc -O2 -o mbc mbc.c
+arm-linux-gnueabihf-gcc -std-c99 -D_XOPEN_SOURCE=700 -o mbc mbc.c
 ```
 
 should be able to compile the utility, since it does not have any dependency
@@ -90,7 +90,7 @@ variables:
   the default is 3000.
 
 - `MBC_KEY_WAIT` sets the number of milliseconds to wait between each key-press;
-  the default is 50.
+  the default is 40.
 
 - `MBC_SEQUENCE_WAIT` sets the number of milliseconds to wait before and after a key
   sequence; the default is 1000.
@@ -106,9 +106,9 @@ The `list_core` command lists the systems. The list will contain the `SYSTEM` id
 the path of the default core. The special system `CUSTOM` can be by mean of the
 following environment variables:
 
-- `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the menu and select
-  the last rom; it must be specified in the same format of the `raw_seq`
-  command. e.g. `MBC_CUSTOM_SEQUENCE=EEMODO`
+- `MBC_CUSTOM_SEQUENCE` is the key sequence needed to open the rom selection
+  menu; it must be specified in the same format of the `raw_seq` command.
+  e.g. `MBC_CUSTOM_SEQUENCE=EEMO`
 
 - `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file, e.g.
   `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
