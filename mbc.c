@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <dirent.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -16,8 +17,10 @@
 #define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
-#define AUX_ROM_NAME "~~~"
+#define MBC_LINK_DIR " !!!MBC"
+#define MBC_LINK_NAM "~~~"
 #define CORE_EXT "rbf"
+#define MBCSEQ "HDOFO"
 
 #define ARRSIZ(A) (sizeof(A)/sizeof(A[0]))
 #define LOG(F,...) printf("%d - " F, __LINE__, __VA_ARGS__ )
@@ -78,7 +81,15 @@ static int ev_close(int fd) {
   return close(fd);
 }
 
-static int mkparent(char *path, mode_t mode) {
+static void path_parentize(char* path){
+  for (int i = strlen(path); i > 0; i--)
+    if (path[i] == '/') {
+      path[i] = '\0';
+      break;
+    }
+}
+
+static int mkparent_core(char *path, mode_t mode) {
   int depth = 0;
   char *curr = path, *found = 0;
 
@@ -113,10 +124,10 @@ static int mkparent(char *path, mode_t mode) {
   return 0;
 }
 
-static int mkparent_dup(const char *path, mode_t mode) {
+static int mkparent(const char *path, mode_t mode) {
   char *pathdup = strdup(path);
   if (!pathdup) return -1;
-  int status = mkparent(pathdup, mode);
+  int status = mkparent_core(pathdup, mode);
   free(pathdup);
   return status;
 }
@@ -127,6 +138,7 @@ typedef struct {
   char *core;    // Path prefix to the core; searched in the internal DB
   char *romdir;  // Must be give explicitely at the command line. It must be LOWERCASE .
   char *romext;  // Valid extension for rom filename; searched in the internal DB
+  char *forceln; // Force auxiliary link location
 } system_t;
 
 static system_t system_list[] = {
@@ -134,114 +146,114 @@ static system_t system_list[] = {
   // The array must be lexicographically sorted wrt the first field (e.g.
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
-  { "ALICEMC10",      "EEMDDDOFO",     "/media/fat/_Computer/AliceMC10_",         "/media/fat/games/AliceMC10",    "c10", },
-  { "AMSTRAD",        "EEMOFO",        "/media/fat/_Computer/Amstrad_",           "/media/fat/games/Amstrad",      "dsk", },
-  { "AMSTRAD-PCW",    "EEMOFO",        "/media/fat/_Computer/Amstrad-PCW_",       "/media/fat/games/Amstrad PCW",  "dsk", },
-  { "AMSTRAD-PCW.B",  "EEMDOFO",       "/media/fat/_Computer/Amstrad-PCW_",       "/media/fat/games/Amstrad PCW",  "dsk", },
-  { "AMSTRAD.B",      "EEMDOFO",       "/media/fat/_Computer/Amstrad_",           "/media/fat/games/Amstrad",      "dsk", },
-  { "AMSTRAD.TAP",    "EEMDDDOFO",     "/media/fat/_Computer/Amstrad_",           "/media/fat/games/Amstrad",      "cdt", },
-  { "AO486",          "EEMOFO",        "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "img", },
-  { "AO486.B",        "EEMDOFO",       "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "img", },
-  { "AO486.C",        "EEMDDOFO",      "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "vhd", },
-  { "AO486.D",        "EEMDDDOFO",     "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "vhd", },
-  { "APOGEE",         "EEMOFO",        "/media/fat/_Computer/Apogee_",            "/media/fat/games/APOGEE",       "rka", },
-  { "APPLE-I",        "EEMOFO",        "/media/fat/_Computer/Apple-I_",           "/media/fat/games/Apple-I",      "txt", },
-  { "APPLE-II",       "EEMOFO",        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
-  { "AQUARIUS.BIN",   "EEMOFO",        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
-  { "AQUARIUS.CAQ",   "EEMDOFO",       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
-  { "ARCADE",         "OFO",           "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", },
-  { "ARCHIE.D1",      "EEMDDDOFO",     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
-  { "ARCHIE.F0",      "EEMOFO",        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
-  { "ARCHIE.F1",      "EEMDOFO",       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
-  { "ASTROCADE",      "EEMOFO",        "/media/fat/_Console/Astrocade_",          "/media/fat/games/Astrocade",    "bin", },
-  { "ATARI2600",      "EEMOFO",        "/media/fat/_Console/Atari2600_",          "/media/fat/games/ATARI2600",    "rom", },
-  { "ATARI2600",      "EEMOFO",        "/media/fat/_Console/Atari2600_",          "/media/fat/games/Astrocade",    "rom", },
-  { "ATARI5200",      "EEMOFO",        "/media/fat/_Console/Atari5200_",          "/media/fat/games/ATARI5200",    "rom", },
-  { "ATARI800.CART",  "EEMDDOFO",      "/media/fat/_Computer/Atari800_",          "/media/fat/games/ATARI800",     "car", },
-  { "ATARI800.D1",    "EEMOFO",        "/media/fat/_Computer/Atari800_",          "/media/fat/games/ATARI800",     "atr", },
-  { "ATARI800.D2",    "EEMDOFO",       "/media/fat/_Computer/Atari800_",          "/media/fat/games/ATARI800",     "atr", },
-  { "BBCMICRO",       "EEMOFO",        "/media/fat/_Computer/BBCMicro_",          "/media/fat/games/BBCMicro",     "vhd", },
-  { "BK0011M",        "EEMOFO",        "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "bin", },
-  { "BK0011M.A",      "EEMDOFO",       "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "dsk", },
-  { "BK0011M.B",      "EEMDDOFO",      "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "dsk", },
-  { "BK0011M.HD",     "EEMDDDOFO",     "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "vhd", },
-  { "C16.CART",       "EEMDOFO",       "/media/fat/_Computer/C16_",               "/media/fat/games/C16",          "bin", },
-  { "C16.DISK",       "EEMDDOFO",      "/media/fat/_Computer/C16_",               "/media/fat/games/C16",          "d64", },
-  { "C16.TAPE",       "EEMDDDOFO",     "/media/fat/_Computer/C16_",               "/media/fat/games/C16",          "tap", },
-  { "C64.CART",       "EEMDDDDOFO",    "/media/fat/_Computer/C64_",               "/media/fat/games/C65",          "crt", },
-  { "C64.DISK",       "EEMOFO",        "/media/fat/_Computer/C64_",               "/media/fat/games/C64",          "rom", },
-  { "C64.PRG",        "EEMDDDOFO",     "/media/fat/_Computer/C64_",               "/media/fat/games/C64",          "prg", },
-  { "C64.TAPE",       "EEMOFO",        "/media/fat/_Computer/C64_",               "/media/fat/games/C64",          "rom", },
-  { "COCO_2",         "EEMDDDDDDOFO",  "/media/fat/_Computer/CoCo2_",             "/media/fat/games/CoCo2",        "rom", },
-  { "COCO_2.CAS",     "EEMDDDDDDDOFO", "/media/fat/_Computer/CoCo2_",             "/media/fat/games/CoCo2",        "cas", },
-  { "COCO_2.CCC",     "EEMDDDDDDOFO",  "/media/fat/_Computer/CoCo2_",             "/media/fat/games/CoCo2",        "ccc", },
-  { "COLECO",         "EEMOFO",        "/media/fat/_Console/ColecoVision_",       "/media/fat/games/Coleco",       "col", },
-  { "COLECO.SG",      "EEMDOFO",       "/media/fat/_Console/ColecoVision_",       "/media/fat/games/Coleco",       "sg",  },
-  { "CUSTOM",         "EEMOFO",        "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
-  { "EDSAC",          "EEMOFO",        "/media/fat/_Computer/EDSAC_",             "/media/fat/games/EDSAC",        "tap", },
-  { "GALAKSIJA",      "EEMOFO",        "/media/fat/_Computer/Galaksija_",         "/media/fat/games/Galaksija",    "tap", },
-  { "GAMEBOY",        "EEMOFO",        "/media/fat/_Console/Gameboy_",            "/media/fat/games/GameBoy",      "gb",  },
-  { "GAMEBOY.COL",    "EEMOFO",        "/media/fat/_Console/Gameboy_",            "/media/fat/games/GameBoy",      "gbc", },
-  { "GBA",            "EEMOFO",        "/media/fat/_Console/GBA_",                "/media/fat/games/GBA",          "gba", },
-  { "GENESIS",        "EEMOFO",        "/media/fat/_Console/Genesis_",            "/media/fat/games/Genesis",      "gen", },
-  { "JUPITER",        "EEMOFO",        "/media/fat/_Computer/Jupiter_",           "/media/fat/games/Jupiter_",     "ace", },
-  { "LASER310",       "EEMOFO",        "/media/fat/_Computer/Laser310_",          "/media/fat/games/Laser310_",    "vz",  },
-  { "MACPLUS.2",      "EEMOFO",        "/media/fat/_Computer/MacPlus_",           "/media/fat/games/MACPLUS",      "dsk", },
-  { "MACPLUS.VHD",    "EEMDOFO",       "/media/fat/_Computer/MacPlus_",           "/media/fat/games/MACPLUS",      "dsk", },
-  { "MEGACD",         "EEMOFO",        "/media/fat/_Console/MegaCD_",             "/media/fat/games/MegaCD",       "cue", },
-  { "MSX",            "EEMOFO",        "/media/fat/_Computer/MSX_",               "/media/fat/games/MSX",          "vhd", },
-  { "NEOGEO",         "EEMOFO",        "/media/fat/_Console/NeoGeo_",             "/media/fat/games/NeoGeo",       "rom", },
-  { "NES",            "EEMOFO",        "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
-  { "NES.FDSBIOS",    "EEMDOFO",       "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
-  { "ODYSSEY2",       "EEMOFO",        "/media/fat/_Console/Odyssey2_",           "/media/fat/games/ODYSSEY2",     "bin", },
-  { "ORAO",           "EEMOFO",        "/media/fat/_Computer/ORAO_",              "/media/fat/games/ORAO",         "tap", },
-  { "ORIC",           "EEMOFO",        "/media/fat/_Computer/Oric_",              "/media/fat/games/Oric_",        "dsk", },
-  { "PDP1",           "EEMOFO",        "/media/fat/_Computer/PDP1_",              "/media/fat/games/PDP1",         "bin", },
-  { "PET2001",        "EEMOFO",        "/media/fat/_Computer/PET2001_",           "/media/fat/games/PET2001",      "prg", },
-  { "PET2001.TAP",    "EEMOFO",        "/media/fat/_Computer/PET2001_",           "/media/fat/games/PET2001",      "tap", },
-  { "QL",             "EEMOFO",        "/media/fat/_Computer/QL_",                "/media/fat/games/QL_",          "mdv", },
-  { "SAMCOUPE.1",     "EEMOFO",        "/media/fat/_Computer/SAMCoupe_",          "/media/fat/games/SAMCOUPE",     "img", },
-  { "SAMCOUPE.2",     "EEMDOFO",       "/media/fat/_Computer/SAMCoupe_",          "/media/fat/games/SAMCOUPE",     "img", },
-  { "SMS",            "EEMOFO",        "/media/fat/_Console/SMS_",                "/media/fat/games/SMS",          "sms", },
-  { "SNES",           "EEMOFO",        "/media/fat/_Console/SNES_",               "/media/fat/games/SNES",         "sfc", },
-  { "SPECIALIST",     "EEMOFO",        "/media/fat/_Computer/Specialist_",        "/media/fat/games/Specialist_",  "rsk", },
-  { "SPECIALIST.ODI", "EEMDOFO",       "/media/fat/_Computer/Specialist_",        "/media/fat/games/Specialist_",  "odi", },
-  { "SPECTRUM",       "EEMDOFO",       "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "tap", },
-  { "SPECTRUM.DSK",   "EEMOFO",        "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "dsk", },
-  { "SPECTRUM.SNAP",  "EEMDDOFO",      "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "z80", },
-  { "TGFX16.SGX",     "EEMDOFO",       "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16",       "sgx", },
-  { "TI-99_4A",       "EEMDOFO",       "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
-  { "TI-99_4A.D",     "EEMDDOFO",      "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
-  { "TI-99_4A.G",     "EEMDDOFO",      "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
-  { "TRS-80",         "EEMOFO",        "/media/fat/_Computer/TRS-80_",            "/media/fat/games/TRS-80_",      "dsk", },
-  { "TRS-80.1",       "EEMDOFO",       "/media/fat/_Computer/TRS-80_",            "/media/fat/games/TRS-80_",      "dsk", },
-  { "TSCONF",         "EEMOFO",        "/media/fat/_Computer/TSConf_",            "/media/fat/games/TSConf_",      "vhd", },
-  { "TURBOGRAFX16",   "EEMOFO",        "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16",       "pce", },
-  { "VECTOR06",       "EEMOFO",        "/media/fat/_Computer/Vector-06C_""/core", "/media/fat/games/VECTOR06",     "rom", },
-  { "VECTOR06.A",     "EEMDOFO",       "/media/fat/_Computer/Vector-06C_""/core", "/media/fat/games/VECTOR06",     "fdd", },
-  { "VECTOR06.B",     "EEMDDOFO",      "/media/fat/_Computer/Vector-06C_""/core", "/media/fat/games/VECTOR06",     "fdd", },
-  { "VECTREX",        "EEMOFO",        "/media/fat/_Console/Vectrex_",            "/media/fat/games/VECTREX",      "vec", },
-  { "VECTREX.OVR",    "EEMDOFO",       "/media/fat/_Console/Vectrex_",            "/media/fat/games/VECTREX",      "ovr", },
-  { "VIC20",          "EEMOFO",        "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "prg", },
-  { "VIC20.CART",     "EEMDOFO",       "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "crt", },
-  { "VIC20.CT",       "EEMDDOFO",      "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "ct",  },
-  { "VIC20.DISK",     "EEMDDDOFO",     "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "d64", },
-  { "ZX81",           "EEMOFO",        "/media/fat/_Computer/ZX81_",              "/media/fat/games/ZX81",         "0",   },
-  { "ZX81.P",         "EEMOFO",        "/media/fat/_Computer/ZX81_",              "/media/fat/games/ZX81",         "p",   },
+  { "ALICEMC10",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/AliceMC10_",         "/media/fat/games/AliceMC10",    "c10", },
+  { "AMSTRAD",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Amstrad_",           "/media/fat/games/Amstrad",      "dsk", },
+  { "AMSTRAD-PCW",    "EEMO" MBCSEQ,        "/media/fat/_Computer/Amstrad-PCW_",       "/media/fat/games/Amstrad PCW",  "dsk", },
+  { "AMSTRAD-PCW.B",  "EEMDO" MBCSEQ,       "/media/fat/_Computer/Amstrad-PCW_",       "/media/fat/games/Amstrad PCW",  "dsk", },
+  { "AMSTRAD.B",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Amstrad_",           "/media/fat/games/Amstrad",      "dsk", },
+  { "AMSTRAD.TAP",    "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Amstrad_",           "/media/fat/games/Amstrad",      "cdt", },
+  { "AO486",          "EEMO" MBCSEQ,        "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "img", },
+  { "AO486.B",        "EEMDO" MBCSEQ,       "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "img", },
+  { "AO486.C",        "EEMDDO" MBCSEQ,      "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "vhd", },
+  { "AO486.D",        "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/ao486_",             "/media/fat/games/AO486",        "vhd", },
+  { "APOGEE",         "EEMO" MBCSEQ,        "/media/fat/_Computer/Apogee_",            "/media/fat/games/APOGEE",       "rka", },
+  { "APPLE-I",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-I_",           "/media/fat/games/Apple-I",      "txt", },
+  { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
+  { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
+  { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
+  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", "/media/fat/_Arcade/_ !!!MBC/~~~.mra", },
+  { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
+  { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
+  { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
+  { "ASTROCADE",      "EEMO" MBCSEQ,        "/media/fat/_Console/Astrocade_",          "/media/fat/games/Astrocade",    "bin", },
+  { "ATARI2600",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari2600_",          "/media/fat/games/ATARI2600",    "rom", },
+  { "ATARI2600",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari2600_",          "/media/fat/games/Astrocade",    "rom", },
+  { "ATARI5200",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari5200_",          "/media/fat/games/ATARI5200",    "rom", },
+  { "ATARI800.CART",  "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Atari800_",          "/media/fat/games/ATARI800",     "car", },
+  { "ATARI800.D1",    "EEMO" MBCSEQ,        "/media/fat/_Computer/Atari800_",          "/media/fat/games/ATARI800",     "atr", },
+  { "ATARI800.D2",    "EEMDO" MBCSEQ,       "/media/fat/_Computer/Atari800_",          "/media/fat/games/ATARI800",     "atr", },
+  { "BBCMICRO",       "EEMO" MBCSEQ,        "/media/fat/_Computer/BBCMicro_",          "/media/fat/games/BBCMicro",     "vhd", },
+  { "BK0011M",        "EEMO" MBCSEQ,        "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "bin", },
+  { "BK0011M.A",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "dsk", },
+  { "BK0011M.B",      "EEMDDO" MBCSEQ,      "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "dsk", },
+  { "BK0011M.HD",     "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/BK0011M_",           "/media/fat/games/BK0011M",      "vhd", },
+  { "C16.CART",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/C16_",               "/media/fat/games/C16",          "bin", },
+  { "C16.DISK",       "EEMDDO" MBCSEQ,      "/media/fat/_Computer/C16_",               "/media/fat/games/C16",          "d64", },
+  { "C16.TAPE",       "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/C16_",               "/media/fat/games/C16",          "tap", },
+  { "C64.CART",       "EEMDDDDO" MBCSEQ,    "/media/fat/_Computer/C64_",               "/media/fat/games/C65",          "crt", },
+  { "C64.DISK",       "EEMO" MBCSEQ,        "/media/fat/_Computer/C64_",               "/media/fat/games/C64",          "rom", },
+  { "C64.PRG",        "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/C64_",               "/media/fat/games/C64",          "prg", },
+  { "C64.TAPE",       "EEMO" MBCSEQ,        "/media/fat/_Computer/C64_",               "/media/fat/games/C64",          "rom", },
+  { "COCO_2",         "EEMDDDDDDO" MBCSEQ,  "/media/fat/_Computer/CoCo2_",             "/media/fat/games/CoCo2",        "rom", },
+  { "COCO_2.CAS",     "EEMDDDDDDDO" MBCSEQ, "/media/fat/_Computer/CoCo2_",             "/media/fat/games/CoCo2",        "cas", },
+  { "COCO_2.CCC",     "EEMDDDDDDO" MBCSEQ,  "/media/fat/_Computer/CoCo2_",             "/media/fat/games/CoCo2",        "ccc", },
+  { "COLECO",         "EEMO" MBCSEQ,        "/media/fat/_Console/ColecoVision_",       "/media/fat/games/Coleco",       "col", },
+  { "COLECO.SG",      "EEMDO" MBCSEQ,       "/media/fat/_Console/ColecoVision_",       "/media/fat/games/Coleco",       "sg",  },
+  { "CUSTOM",         "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
+  { "EDSAC",          "EEMO" MBCSEQ,        "/media/fat/_Computer/EDSAC_",             "/media/fat/games/EDSAC",        "tap", },
+  { "GALAKSIJA",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Galaksija_",         "/media/fat/games/Galaksija",    "tap", },
+  { "GAMEBOY",        "EEMO" MBCSEQ,        "/media/fat/_Console/Gameboy_",            "/media/fat/games/GameBoy",      "gb",  },
+  { "GAMEBOY.COL",    "EEMO" MBCSEQ,        "/media/fat/_Console/Gameboy_",            "/media/fat/games/GameBoy",      "gbc", },
+  { "GBA",            "EEMO" MBCSEQ,        "/media/fat/_Console/GBA_",                "/media/fat/games/GBA",          "gba", },
+  { "GENESIS",        "EEMO" MBCSEQ,        "/media/fat/_Console/Genesis_",            "/media/fat/games/Genesis",      "gen", },
+  { "JUPITER",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Jupiter_",           "/media/fat/games/Jupiter_",     "ace", },
+  { "LASER310",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Laser310_",          "/media/fat/games/Laser310_",    "vz",  },
+  { "MACPLUS.2",      "EEMO" MBCSEQ,        "/media/fat/_Computer/MacPlus_",           "/media/fat/games/MACPLUS",      "dsk", },
+  { "MACPLUS.VHD",    "EEMDO" MBCSEQ,       "/media/fat/_Computer/MacPlus_",           "/media/fat/games/MACPLUS",      "dsk", },
+  { "MEGACD",         "EEMO" MBCSEQ,        "/media/fat/_Console/MegaCD_",             "/media/fat/games/MegaCD",       "cue", },
+  { "MSX",            "EEMO" MBCSEQ,        "/media/fat/_Computer/MSX_",               "/media/fat/games/MSX",          "vhd", },
+  { "NEOGEO",         "EEMO" MBCSEQ,        "/media/fat/_Console/NeoGeo_",             "/media/fat/games/NeoGeo",       "neo", },
+  { "NES",            "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
+  { "NES.FDSBIOS",    "EEMDO" MBCSEQ,       "/media/fat/_Console/NES_",                "/media/fat/games/NES",          "nes", },
+  { "ODYSSEY2",       "EEMO" MBCSEQ,        "/media/fat/_Console/Odyssey2_",           "/media/fat/games/ODYSSEY2",     "bin", },
+  { "ORAO",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ORAO_",              "/media/fat/games/ORAO",         "tap", },
+  { "ORIC",           "EEMO" MBCSEQ,        "/media/fat/_Computer/Oric_",              "/media/fat/games/Oric_",        "dsk", },
+  { "PDP1",           "EEMO" MBCSEQ,        "/media/fat/_Computer/PDP1_",              "/media/fat/games/PDP1",         "bin", },
+  { "PET2001",        "EEMO" MBCSEQ,        "/media/fat/_Computer/PET2001_",           "/media/fat/games/PET2001",      "prg", },
+  { "PET2001.TAP",    "EEMO" MBCSEQ,        "/media/fat/_Computer/PET2001_",           "/media/fat/games/PET2001",      "tap", },
+  { "QL",             "EEMO" MBCSEQ,        "/media/fat/_Computer/QL_",                "/media/fat/games/QL_",          "mdv", },
+  { "SAMCOUPE.1",     "EEMO" MBCSEQ,        "/media/fat/_Computer/SAMCoupe_",          "/media/fat/games/SAMCOUPE",     "img", },
+  { "SAMCOUPE.2",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/SAMCoupe_",          "/media/fat/games/SAMCOUPE",     "img", },
+  { "SMS",            "EEMO" MBCSEQ,        "/media/fat/_Console/SMS_",                "/media/fat/games/SMS",          "sms", },
+  { "SNES",           "EEMO" MBCSEQ,        "/media/fat/_Console/SNES_",               "/media/fat/games/SNES",         "sfc", },
+  { "SPECIALIST",     "EEMO" MBCSEQ,        "/media/fat/_Computer/Specialist_",        "/media/fat/games/Specialist_",  "rsk", },
+  { "SPECIALIST.ODI", "EEMDO" MBCSEQ,       "/media/fat/_Computer/Specialist_",        "/media/fat/games/Specialist_",  "odi", },
+  { "SPECTRUM",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "tap", },
+  { "SPECTRUM.DSK",   "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "dsk", },
+  { "SPECTRUM.SNAP",  "EEMDDO" MBCSEQ,      "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "z80", },
+  { "TGFX16.SGX",     "EEMDO" MBCSEQ,       "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16",       "sgx", },
+  { "TI-99_4A",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
+  { "TI-99_4A.D",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
+  { "TI-99_4A.G",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
+  { "TRS-80",         "EEMO" MBCSEQ,        "/media/fat/_Computer/TRS-80_",            "/media/fat/games/TRS-80_",      "dsk", },
+  { "TRS-80.1",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/TRS-80_",            "/media/fat/games/TRS-80_",      "dsk", },
+  { "TSCONF",         "EEMO" MBCSEQ,        "/media/fat/_Computer/TSConf_",            "/media/fat/games/TSConf_",      "vhd", },
+  { "TURBOGRAFX16",   "EEMO" MBCSEQ,        "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16",       "pce", },
+  { "VECTOR06",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Vector-06C_""/core", "/media/fat/games/VECTOR06",     "rom", },
+  { "VECTOR06.A",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/Vector-06C_""/core", "/media/fat/games/VECTOR06",     "fdd", },
+  { "VECTOR06.B",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Vector-06C_""/core", "/media/fat/games/VECTOR06",     "fdd", },
+  { "VECTREX",        "EEMO" MBCSEQ,        "/media/fat/_Console/Vectrex_",            "/media/fat/games/VECTREX",      "vec", },
+  { "VECTREX.OVR",    "EEMDO" MBCSEQ,       "/media/fat/_Console/Vectrex_",            "/media/fat/games/VECTREX",      "ovr", },
+  { "VIC20",          "EEMO" MBCSEQ,        "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "prg", },
+  { "VIC20.CART",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "crt", },
+  { "VIC20.CT",       "EEMDDO" MBCSEQ,      "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "ct",  },
+  { "VIC20.DISK",     "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/VIC20_",             "/media/fat/games/VIC20",        "d64", },
+  { "ZX81",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "/media/fat/games/ZX81",         "0",   },
+  { "ZX81.P",         "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "/media/fat/games/ZX81",         "p",   },
 
   // unsupported
-  // { "AMIGA",       "EEMOFO",            "/media/fat/_Computer/Minimig_",           "/media/fat/games/Amiga",     0, },
-  // { "ATARIST",       "EEMOFO",            "/media/fat/_Computer/AtariST_",           "/media/fat/games/AtariST",     0, },
-  // { "AY-3-8500",     0,            "/media/fat/_Console/AY-3-8500_",          "/media/fat/games/AY-3-8500",    0, },
-  // { "Altair8800"     , 0 , 0, 0, 0, },
-  // { "MULTICOMP",     0,            "/media/fat/_Computer/MultiComp_",         "/media/fat/games/MultiComp",   0, },
-  // { "MultiComp"      , 0 , 0, 0, 0, },
-  // { "SHARPMZ",       "EEMOFO",            "/media/fat/_Computer/SharpMZ_",           "/media/fat/games/SharpMZ_",     0, },
-  // { "X68000"         , 0 , 0, 0, 0, },
+  //{ "AMIGA",          "EEMO" MBCSEQ,        "/media/fat/_Computer/Minimig_",           "/media/fat/games/Amiga",     0, },
+  //{ "ATARIST",        "EEMO" MBCSEQ,        "/media/fat/_Computer/AtariST_",           "/media/fat/games/AtariST",     0, },
+  //{ "AY-3-8500",      0,                    "/media/fat/_Console/AY-3-8500_",          "/media/fat/games/AY-3-8500",    0, },
+  //{ "Altair8800"      , 0 , 0, 0, 0, },
+  //{ "MULTICOMP",      0,                    "/media/fat/_Computer/MultiComp_",         "/media/fat/games/MultiComp",   0, },
+  //{ "MultiComp"       , 0 , 0, 0, 0, },
+  //{ "SHARPMZ",        "EEMO" MBCSEQ,        "/media/fat/_Computer/SharpMZ_",           "/media/fat/games/SharpMZ_",     0, },
+  //{ "X68000"          , 0 , 0, 0, 0, },
 };
 
 int core_wait = 3000; // ms
-int inter_key_wait = 50; // ms
+int inter_key_wait = 40; // ms
 int sequence_wait = 1000; // ms
 
 static void emulate_key(int fd, int key) {
@@ -367,29 +379,49 @@ static int load_core(system_t* sys, char* corepath) {
   return 0;
 }
 
-static int rom_unlink_by_path(system_t* sys, char* rompath) {
-  return unlink(rompath);
-}
-
 static int get_aux_rom_path(system_t* sys, char* out, size_t len){
-  return snprintf(out, len, "%s/%s.%s", sys->romdir, AUX_ROM_NAME, sys->romext);
+
+  if (sys->forceln) return -(NULL == strncpy(out, sys->forceln, len));
+
+  // Link point for the auxiliary rom. Omitting the MBC_LINK_DIR whould be simpler,
+  // but it would not work with some core. For example the NeoGeo lists the roms
+  // by an internal name, not the file one. This make it impossible to place
+  // the auxiliary rom in a specific point in the list, without using the
+  // sub-directory trick.
+
+  return (0>= snprintf(out, len, "%s/%s/%s.%s", sys->romdir, MBC_LINK_DIR, MBC_LINK_NAM, sys->romext));
 }
 
 static int rom_unlink(system_t* sys) {
-  char rompath[4096] = {0};
-  get_aux_rom_path(sys, rompath, sizeof(rompath));
-  return unlink(rompath);
+  char rompath[PATH_MAX] = {0};
+
+  if (get_aux_rom_path(sys, rompath, sizeof(rompath))) return -1;
+  if (unlink(rompath)) return -1;
+
+  for (int k = strlen(rompath); k >= 0; k -= 1) {
+    if (rompath[k] == '/') {
+      rompath[k] = '\0';
+      break;
+    }
+  }
+
+  if (rmdir(rompath)) return -1;
+
+  return 0;
 }
 
 static int rom_link(system_t* sys, char* path) {
 
-  // if (mkparent_dup(path, 0777) < 0) return -1;
+  rom_unlink(sys); // It is expected that this can fail in some cases
 
-  char rompath[4096] = {0};
+  char rompath[PATH_MAX] = {0};
   get_aux_rom_path(sys, rompath, sizeof(rompath));
 
-  rom_unlink_by_path(sys, rompath); // It is expected that this fails in some cases
-  
+  if (mkparent(rompath, 0777) < 0) {
+    PRINTERR("Can not create %s parent directory\n", rompath);
+    return -1;
+  }
+
   int ret = symlink(path, rompath);
   if (0 != ret) {
     PRINTERR("Can not link %s -> %s\n", rompath, path);
@@ -407,28 +439,20 @@ static int emulate_system_sequence(system_t* sys) {
 }
 
 static int load_rom(system_t* sys, char* rom) {
+  int err;
 
-  int ret = rom_link(sys, rom);
-  if (0 > ret) {
-    PRINTERR("%s\n", "Can not bind the rom");
-    rom_unlink(sys);
-    return -1;
+  err = rom_link(sys, rom);
+  if (err) PRINTERR("%s\n", "Can not bind the rom");
+
+  if (!err) {
+    err = emulate_system_sequence(sys);
+    if (err) PRINTERR("%s\n", "Error during key emulation");
   }
 
-  ret = emulate_system_sequence(sys);
-  if (0 > ret) {
-    PRINTERR("%s\n", "Error during key emulation");
-    rom_unlink(sys);
-    return -1;
-  }
+  err = rom_unlink(sys);
+  if (err) PRINTERR("%s\n", "Can not unbind the rom");
 
-  ret = rom_unlink(sys);
-  if (0 > ret) {
-    PRINTERR("%s\n", "Can not unbind the rom");
-    return -1;
-  }
-
-  return 0;
+  return err;
 }
 
 static int has_ext(char* name, char* ext){
@@ -680,14 +704,24 @@ static void read_options(int argc, char* argv[]) {
   } else {
 
     // Note: no need to free the duplicated string since they last until the end of the run
+
     val = getenv("MBC_CUSTOM_CORE");
     if (NULL != val && val[0] != '\0') custom_system->core = strdup(val);
     val = getenv("MBC_CUSTOM_ROM_PATH");
     if (NULL != val && val[0] != '\0') custom_system->romdir = strdup(val);
     val = getenv("MBC_CUSTOM_ROM_EXT");
     if (NULL != val && val[0] != '\0') custom_system->romext = strdup(val);
+
     val = getenv("MBC_CUSTOM_SEQUENCE");
-    if (NULL != val && val[0] != '\0') custom_system->menuseq = strdup(val);
+    if (NULL != val && val[0] != '\0') {
+      int siz = strlen(val);
+      char* seq = malloc(siz + strlen(MBCSEQ) +1);
+      if (seq) {
+        strcpy(seq, val);
+        strcpy(seq + siz, MBCSEQ);
+      }
+      custom_system->menuseq = seq;
+    }
   }
 
   val = getenv("MBC_CORE_WAIT");
