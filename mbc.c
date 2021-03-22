@@ -422,9 +422,15 @@ static int rom_link(system_t* sys, char* path) {
     return -1;
   }
 
-  int ret = symlink(path, rompath);
+  char* rpath = realpath(path, 0);
+  if (!rpath) {
+    PRINTERR("Can not resolve %s\n", path);
+    return -1;
+  }
+
+  int ret = symlink(rpath, rompath);
   if (0 != ret) {
-    PRINTERR("Can not link %s -> %s\n", rompath, path);
+    PRINTERR("Can not link %s -> %s\n", rompath, rpath);
     return -1;
   }
 
