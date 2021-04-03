@@ -17,7 +17,7 @@ download the [gcc/musl crosscompile toolchain](http://musl.cc), and to compile
 a static version of the application. However, also a simple command like:
 
 ```
-arm-linux-gnueabihf-gcc -std-c99 -D_XOPEN_SOURCE=700 -o mbc mbc.c
+arm-linux-gnueabihf-gcc -std=c99 -static -D_XOPEN_SOURCE=700 -o mbc mbc.c
 ```
 
 should be able to compile the utility, since it does not have any dependency
