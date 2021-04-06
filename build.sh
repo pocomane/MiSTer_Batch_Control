@@ -24,8 +24,8 @@ cd build
 arm-linux-musleabihf-gcc -std=c99 -D_XOPEN_SOURCE=700 -static -O2 -o mbc ../mbc.c ||die
 arm-linux-musleabihf-strip mbc ||die
 mkdir -p hook/action ||die
-echo "#!/bin/bash" > "hook/action/__unnamed__" ||die
-echo "./mbc \$@"  >> "hook/action/__unnamed__" ||die
+echo "#!/bin/bash" > "hook/expose/__unnamed__" ||die
+echo "./mbc \$@"  >> "hook/expose/__unnamed__" ||die
 tar -czf mbc.tar.gz mbc ./hook/action/__unnamed__
 cd ..
 
