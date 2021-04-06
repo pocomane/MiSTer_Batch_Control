@@ -23,5 +23,8 @@ echo "building..."
 cd build
 arm-linux-musleabihf-gcc -std=c99 -D_XOPEN_SOURCE=700 -static -O2 -o mbc ../mbc.c ||die
 arm-linux-musleabihf-strip mbc ||die
+mkdir -p hook/action ||die
+echo -e "#!/bin/bash\n./mbc $@" > "hook/action/__unnamed__" ||die
+tar -czf mbc.tar.gz mbc ./hook/action/__unnamed__
 cd ..
 

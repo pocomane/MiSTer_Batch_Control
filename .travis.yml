@@ -9,7 +9,7 @@ deploy:
   provider: releases
   api_key: $GITHUB_API_KEY
   file_glob: true
-  file: "build/mbc"
+  file: build/mbc*
   skip_cleanup: true
 
 branches:
