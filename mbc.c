@@ -89,6 +89,26 @@ static void path_parentize(char* path){
     }
 }
 
+static int is_dir(const char* path){
+  struct stat st;
+  int stat_error = stat(path, &st);
+  if (!stat_error && S_ISDIR(st.st_mode))
+    return 1;
+  return 0;
+}
+
+static int mkdir_core(const char* path, mode_t mode){
+
+  int created = !mkdir(path, mode);
+  if (created) return 0;
+
+  // no error if a directory already exist
+  if (!created && errno == EEXIST && is_dir(path))
+    return 0;
+
+  return -1;
+}
+
 static int mkparent_core(char *path, mode_t mode) {
   int depth = 0;
   char *curr = path, *found = 0;
@@ -98,26 +118,10 @@ static int mkparent_core(char *path, mode_t mode) {
       depth += 1;
 
       *found = '\0';
-      int created = !mkdir(path, mode);
-      int already_exist = (errno == EEXIST);
+      int err = mkdir_core(path, mode);
       *found = '/';
 
-      // no error if a directory already exist
-      if (!created && !already_exist) {
-        return -depth;
-      } else {
-        if (already_exist) {
-          struct stat st;
-          *found = '\0';
-          int stat_error = stat(path, &st);
-          *found = '/';
-          if (stat_error) return -depth;
-          if (!S_ISDIR(st.st_mode)) {
-            return -depth;
-          }
-        }
-      }
-
+      if (err) return -depth;
     }
     curr = found + 1;
   }
@@ -132,12 +136,26 @@ static int mkparent(const char *path, mode_t mode) {
   return status;
 }
 
+static int mkdirpath(const char *path, mode_t mode) {
+  if (is_dir(path)) return 0;
+  int result = mkparent(path, mode);
+  if (result) return result;
+  return mkdir_core(path, mode);
+}
+
+// Can be chained with |
+typedef enum {
+  NONE = 0,
+  REMOVE_EMPTY_ROM_DIR, // Try to remove the rom dir if it is empty during the rom unlink
+} sysopt_t;
+
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
   char *menuseq; // Sequence of input for the rom selection; searched in the internal DB
   char *core;    // Path prefix to the core; searched in the internal DB
   char *romdir;  // Must be give explicitely at the command line. It must be LOWERCASE .
   char *romext;  // Valid extension for rom filename; searched in the internal DB
+  sysopt_t opt;  // Special options, see sysopt_t
 } system_t;
 
 static system_t system_list[] = {
@@ -160,7 +178,7 @@ static system_t system_list[] = {
   { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
   { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
   { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
-  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", },
+  { "ARCADE",         "ODO" MBCSEQ,         "/media/fat/menu",                         "/media/fat/_Arcade/_ !MBC",     "mra", REMOVE_EMPTY_ROM_DIR},
   { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
   { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
   { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
@@ -452,6 +470,11 @@ static int rom_link(system_t* sys, char* path) {
     return -1;
   }
 
+  if (mkdirpath(sys->romdir, 0777)){
+    PRINTERR("Rom path must be a directory: %s\n", sys->romdir);
+    return -1;
+  }
+
   path_parentize(aux_dir_path);
   if (filesystem_bind(aux_dir_path, sys->romdir)){
     PRINTERR("Can not bind %s to %s\n", aux_dir_path, sys->romdir);
@@ -482,6 +505,10 @@ static int rom_unlink(system_t* sys) {
   if (result) {
     PRINTERR("Can not unbind %s\n", sys->romdir);
     return result;
+  }
+
+  if (sys->opt | REMOVE_EMPTY_ROM_DIR){
+    if (rmdir(sys->romdir)) PRINTERR("Can not remove %s\n", sys->romdir);
   }
 
   return result;

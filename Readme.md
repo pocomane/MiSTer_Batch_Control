@@ -25,9 +25,11 @@ should be able to compile the utility, since it does not have any dependency
 
 # Support
 
-Some functionalities need specific support for each cores. If you want that a
-particular core is directly supported, please open a github issue specifying
-the value of variables described int the `list_core` command in this Readme.
+Some functionalities need specific support for each cores. You can experiment
+with non supported core using the `CUSTOM` system: it is configurable as
+described in the `list_core` command section.  If you make a system work in
+this way, please open a github issue specifying the value of the variables,
+so the its support can be easly added.
 
 Please note that these informations could change from one release of the MiSTer
 to another, so please, make sure you are referring to the last release. If the
