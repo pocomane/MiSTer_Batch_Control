@@ -160,7 +160,7 @@ static system_t system_list[] = {
   { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
   { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
   { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
-  { "ARCADE",         "ODO" MBCSEQ,         "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", },
+  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", },
   { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
   { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
   { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
@@ -379,7 +379,10 @@ static int load_core(system_t* sys, char* corepath) {
 }
 
 static int get_aux_rom_path(system_t* sys, char* out, int len){
-  return (0>= snprintf(out, len, "/%s/%s/%s.%s", MBC_TMP_DIR, sys->id, MBC_LINK_NAM, sys->romext));
+  // Note: each directory will contain exactly one file
+  // The extension is added to the folder too, for systems that may have
+  // multiple rom extensione, e.g. the CUSTOM system.
+  return (0>= snprintf(out, len, "/%s/%s.%s/%s.%s", MBC_TMP_DIR, sys->id, sys->romext, MBC_LINK_NAM, sys->romext));
 }
 
 static int create_aux_rom_file(system_t* sys, char* path){
@@ -396,7 +399,7 @@ static int create_aux_rom_file(system_t* sys, char* path){
 static int filesystem_bind(const char* source, const char* target) {
   int err = 0;
   for(int r = 0; r < 20; r += 1){
-    if (r != retry){
+    if (r != 0){
       LOG("retrying the binding since the mount point is busy (%s -> %s)\n", source, target);
       msleep(1000);
     }
@@ -454,7 +457,7 @@ static int rom_link(system_t* sys, char* path) {
     PRINTERR("Can not bind %s to %s\n", aux_dir_path, sys->romdir);
     return -1;
   }
-  
+
   get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
   if (filesystem_unbind(aux_dir_path)){
     PRINTERR("Can not unbind %s\n", aux_dir_path);
@@ -480,7 +483,7 @@ static int rom_unlink(system_t* sys) {
     PRINTERR("Can not unbind %s\n", sys->romdir);
     return result;
   }
-  
+
   return result;
 }
 
