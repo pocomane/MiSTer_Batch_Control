@@ -17,10 +17,10 @@
 #define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
-#define MBC_LINK_DIR " !!!MBC"
+#define MBC_TMP_DIR "/run/mbc"
 #define MBC_LINK_NAM "~~~"
 #define CORE_EXT "rbf"
-#define MBCSEQ "HDOFO"
+#define MBCSEQ "FO"
 
 #define ARRSIZ(A) (sizeof(A)/sizeof(A[0]))
 #define LOG(F,...) printf("%d - " F, __LINE__, __VA_ARGS__ )
@@ -138,7 +138,6 @@ typedef struct {
   char *core;    // Path prefix to the core; searched in the internal DB
   char *romdir;  // Must be give explicitely at the command line. It must be LOWERCASE .
   char *romext;  // Valid extension for rom filename; searched in the internal DB
-  char *forceln; // Force auxiliary link location
 } system_t;
 
 static system_t system_list[] = {
@@ -161,7 +160,7 @@ static system_t system_list[] = {
   { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
   { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
   { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
-  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", "/media/fat/_Arcade/_ !!!MBC/~~~.mra", },
+  { "ARCADE",         "ODO" MBCSEQ,         "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", },
   { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
   { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
   { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
@@ -379,62 +378,110 @@ static int load_core(system_t* sys, char* corepath) {
   return 0;
 }
 
-static int get_aux_rom_path(system_t* sys, char* out, size_t len){
-
-  if (sys->forceln) return -(NULL == strncpy(out, sys->forceln, len));
-
-  // Link point for the auxiliary rom. Omitting the MBC_LINK_DIR whould be simpler,
-  // but it would not work with some core. For example the NeoGeo lists the roms
-  // by an internal name, not the file one. This make it impossible to place
-  // the auxiliary rom in a specific point in the list, without using the
-  // sub-directory trick.
-
-  return (0>= snprintf(out, len, "%s/%s/%s.%s", sys->romdir, MBC_LINK_DIR, MBC_LINK_NAM, sys->romext));
+static int get_aux_rom_path(system_t* sys, char* out, int len){
+  return (0>= snprintf(out, len, "/%s/%s/%s.%s", MBC_TMP_DIR, sys->id, MBC_LINK_NAM, sys->romext));
 }
 
-static int rom_unlink(system_t* sys) {
-  char rompath[PATH_MAX] = {0};
+static int create_aux_rom_file(system_t* sys, char* path){
+  char aux_dir_path[PATH_MAX] = {0};
+  int result = get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
+  if (result) return result;
+  result = mkparent(aux_dir_path, 0777);
+  if (result) return result;
+  FILE* f = fopen(aux_dir_path, "ab");
+  if (!f) return errno;
+  return fclose(f);
+}
 
-  if (get_aux_rom_path(sys, rompath, sizeof(rompath))) return -1;
-  if (unlink(rompath)) return -1;
-
-  for (int k = strlen(rompath); k >= 0; k -= 1) {
-    if (rompath[k] == '/') {
-      rompath[k] = '\0';
-      break;
+static int filesystem_bind(const char* source, const char* target) {
+  int err = 0;
+  for(int r = 0; r < 20; r += 1){
+    if (r != retry){
+      LOG("retrying the binding since the mount point is busy (%s -> %s)\n", source, target);
+      msleep(1000);
     }
+
+    err = mount(source, target, "", MS_BIND | MS_RDONLY | MS_REC, "");
+
+    if (err) err = errno;
+    if (EBUSY != err) break;
   }
+  return err;
+}
 
-  if (rmdir(rompath)) return -1;
+static int filesystem_unbind(const char* path) {
+  int err = 0;
+  for(int r = 0; r < 20; r += 1){
+    if (r != 0) {
+      LOG("retrying the unbinding since the mount point is busy (%s)\n", path);
+      msleep(1000);
+    }
 
-  return 0;
+    err = umount(path);
+
+    if (err) err = errno;
+    if (EBUSY != err) break;
+  }
+  return err;
 }
 
 static int rom_link(system_t* sys, char* path) {
 
-  rom_unlink(sys); // It is expected that this can fail in some cases
+  // Some cores do not simply list the content of the rom-dir. For example the
+  // NeoGeo shows the roms by an internal name, not the file one.  So the
+  // best way to handle the rom-dir is to bind it to another dir containing
+  // just one file.
+  //
+  // This file can not be a link since realpath was reported to have issue with
+  // CIFS mounts, and handling relative link by hand is cumbersome. So we use
+  // a bind for this file too.
 
-  char rompath[PATH_MAX] = {0};
-  get_aux_rom_path(sys, rompath, sizeof(rompath));
+  char aux_dir_path[PATH_MAX] = {0};
+  get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
 
-  if (mkparent(rompath, 0777) < 0) {
-    PRINTERR("Can not create %s parent directory\n", rompath);
+  if (create_aux_rom_file(sys, aux_dir_path)) {
+    PRINTERR("Can not create file %s\n", aux_dir_path);
     return -1;
   }
 
-  char* rpath = realpath(path, 0);
-  if (!rpath) {
-    PRINTERR("Can not resolve %s\n", path);
+  if (filesystem_bind(path, aux_dir_path)) {
+    PRINTERR("Can not bind %s to %s\n", path, aux_dir_path);
     return -1;
   }
 
-  int ret = symlink(rpath, rompath);
-  if (0 != ret) {
-    PRINTERR("Can not link %s -> %s\n", rompath, rpath);
+  path_parentize(aux_dir_path);
+  if (filesystem_bind(aux_dir_path, sys->romdir)){
+    PRINTERR("Can not bind %s to %s\n", aux_dir_path, sys->romdir);
     return -1;
+  }
+  
+  get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
+  if (filesystem_unbind(aux_dir_path)){
+    PRINTERR("Can not unbind %s\n", aux_dir_path);
+    // On error it is better to continue in order to clear the other mount point at least
   }
 
   return 0;
+}
+
+static int rom_unlink(system_t* sys) {
+  int result;
+  char aux_path[PATH_MAX] = {0};
+
+  snprintf(aux_path, sizeof(aux_path)-1, "%s/%s.%s", sys->romdir, MBC_LINK_NAM, sys->romext);
+  result = filesystem_unbind(aux_path);
+  if (result) {
+    PRINTERR("Can not unbind %s\n", aux_path);
+    return result;
+  }
+
+  result = filesystem_unbind(sys->romdir);
+  if (result) {
+    PRINTERR("Can not unbind %s\n", sys->romdir);
+    return result;
+  }
+  
+  return result;
 }
 
 static int emulate_system_sequence(system_t* sys) {
@@ -638,12 +685,6 @@ struct cmdentry cmdlist[] = {
 
 static int run_command(int narg, char** args) {
 
-  // DEBUG
-  // printf("%d arguments command\n", narg);
-  // for (int a=0; a<narg; a+=1){
-  //   printf("arg %d] %s\n", a, args[a]);
-  // }
- 
   // match the command
   struct cmdentry target = {args[0], 0};
   struct cmdentry * command = (struct cmdentry*)
