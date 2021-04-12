@@ -417,10 +417,8 @@ static int create_aux_rom_file(system_t* sys, char* path){
 static int filesystem_bind(const char* source, const char* target) {
   int err = 0;
   for(int r = 0; r < 20; r += 1){
-    if (r != 0){
-      LOG("retrying the binding since the mount point is busy (%s -> %s)\n", source, target);
-      msleep(1000);
-    }
+    if (r > 14) LOG("retrying the binding since the mount point is busy (%s -> %s)\n", source, target);
+    if (r != 0) msleep(1000);
 
     err = mount(source, target, "", MS_BIND | MS_RDONLY | MS_REC, "");
 
@@ -433,10 +431,8 @@ static int filesystem_bind(const char* source, const char* target) {
 static int filesystem_unbind(const char* path) {
   int err = 0;
   for(int r = 0; r < 20; r += 1){
-    if (r != 0) {
-      LOG("retrying the unbinding since the mount point is busy (%s)\n", path);
-      msleep(1000);
-    }
+    if (r > 14) LOG("retrying the unbinding since the mount point is busy (%s)\n", path);
+    if (r != 0) msleep(1000);
 
     err = umount(path);
 
