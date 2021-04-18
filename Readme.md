@@ -23,6 +23,14 @@ arm-linux-gnueabihf-gcc -std=c99 -static -D_XOPEN_SOURCE=700 -o mbc mbc.c
 should be able to compile the utility, since it does not have any dependency
 (except standard C library and linux interface).
 
+The default utility works by creating symbolic links to the target rom files.
+Another system is avaiable, using mount/bind points. To enable this feature, the
+source must be compiled defining `USE_MOUNT_POINTS`, e.g. :
+
+```
+arm-linux-gnueabihf-gcc -std=c99 -static -DUSE_MOUNT_POINT -D_XOPEN_SOURCE=700 -o mbc mbc.c
+```
+
 # Support
 
 Some functionalities need specific support for each cores. You can experiment

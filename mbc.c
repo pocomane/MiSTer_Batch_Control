@@ -20,7 +20,7 @@
 #define MBC_TMP_DIR "/run/mbc"
 #define MBC_LINK_NAM "~~~"
 #define CORE_EXT "rbf"
-#define MBCSEQ "DOFO"
+#define MBCSEQ "HDOFO"
 #define ROMSUBLINK " !MBC"
 
 #define ARRSIZ(A) (sizeof(A)/sizeof(A[0]))
@@ -406,6 +406,9 @@ static int get_aux_rom_path(system_t* sys, char* out, int len){
   return (0>= snprintf(out, len, "/%s/%s.%s/%s.%s", MBC_TMP_DIR, sys->id, sys->romext, MBC_LINK_NAM, sys->romext));
 }
 
+
+#ifdef USE_MOUNT_POINTS
+
 static int create_aux_rom_file(system_t* sys, char* path){
   char aux_dir_path[PATH_MAX] = {0};
   int result = get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
@@ -516,6 +519,57 @@ static int rom_unlink(system_t* sys) {
 
   return result;
 }
+
+
+#else // USE_MOUNT_POINTS
+
+static int rom_unlink(system_t* sys) {
+  char rompath[PATH_MAX] = {0};
+
+  get_link_path(sys, rompath, sizeof(rompath));
+  if (unlink(rompath)) return -1;
+
+  for (int k = strlen(rompath); k >= 0; k -= 1) {
+    if (rompath[k] == '/') {
+      rompath[k] = '\0';
+      break;
+    }
+  }
+
+  if (rmdir(rompath)) return -1;
+
+  return 0;
+}
+
+static int rom_link(system_t* sys, char* path) {
+
+  rom_unlink(sys); // It is expected that this can fail in some cases
+
+  char rompath[PATH_MAX] = {0};
+  get_link_path(sys, rompath, sizeof(rompath));
+
+  if (mkparent(rompath, 0777) < 0) {
+    PRINTERR("Can not create %s parent directory\n", rompath);
+    return -1;
+  }
+
+  char* rpath = realpath(path, 0);
+  if (!rpath) {
+    PRINTERR("Can not resolve %s\n", path);
+    return -1;
+  }
+
+  int ret = symlink(rpath, rompath);
+  if (0 != ret) {
+    PRINTERR("Can not link %s -> %s\n", rompath, rpath);
+    return -1;
+  }
+
+  return 0;
+}
+
+
+#endif // USE_MOUNT_POINTS
 
 static int emulate_system_sequence(system_t* sys) {
   if (NULL == sys) {
