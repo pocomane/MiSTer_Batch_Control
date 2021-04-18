@@ -20,7 +20,8 @@
 #define MBC_TMP_DIR "/run/mbc"
 #define MBC_LINK_NAM "~~~"
 #define CORE_EXT "rbf"
-#define MBCSEQ "FO"
+#define MBCSEQ "DOFO"
+#define ROMSUBLINK " !MBC"
 
 #define ARRSIZ(A) (sizeof(A)/sizeof(A[0]))
 #define LOG(F,...) printf("%d - " F, __LINE__, __VA_ARGS__ )
@@ -136,18 +137,13 @@ static int mkparent(const char *path, mode_t mode) {
   return status;
 }
 
-static int mkdirpath(const char *path, mode_t mode) {
-  if (is_dir(path)) return 0;
-  int result = mkparent(path, mode);
-  if (result) return result;
-  return mkdir_core(path, mode);
-}
-
-// Can be chained with |
-typedef enum {
-  NONE = 0,
-  REMOVE_EMPTY_ROM_DIR, // Try to remove the rom dir if it is empty during the rom unlink
-} sysopt_t;
+// // Not used
+// static int mkdirpath(const char *path, mode_t mode) {
+//   if (is_dir(path)) return 0;
+//   int result = mkparent(path, mode);
+//   if (result) return result;
+//   return mkdir_core(path, mode);
+// }
 
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
@@ -155,7 +151,7 @@ typedef struct {
   char *core;    // Path prefix to the core; searched in the internal DB
   char *romdir;  // Must be give explicitely at the command line. It must be LOWERCASE .
   char *romext;  // Valid extension for rom filename; searched in the internal DB
-  sysopt_t opt;  // Special options, see sysopt_t
+  char *sublink; // Subfolder of romdir where to create the rom links. If NULL, a defaoult one will be used
 } system_t;
 
 static system_t system_list[] = {
@@ -178,7 +174,7 @@ static system_t system_list[] = {
   { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
   { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
   { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
-  { "ARCADE",         "ODO" MBCSEQ,         "/media/fat/menu",                         "/media/fat/_Arcade/_ !MBC",     "mra", REMOVE_EMPTY_ROM_DIR},
+  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade/_ !MBC",     "mra", "_ !MBC"},
   { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
   { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
   { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
@@ -239,7 +235,7 @@ static system_t system_list[] = {
   { "SPECTRUM.DSK",   "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "dsk", },
   { "SPECTRUM.SNAP",  "EEMDDO" MBCSEQ,      "/media/fat/_Computer/ZX-Spectrum_",       "/media/fat/games/Spectrum",     "z80", },
   { "TGFX16",         "EEMO" MBCSEQ,        "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16",       "pce", },
-  { "TGFX16.CD",      "EEMDDODO" MBCSEQ,    "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16-CD/ !MBC", "chd", REMOVE_EMPTY_ROM_DIR},
+  { "TGFX16.CD",      "EEMDDO" MBCSEQ,      "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16-CD",    "chd", },
   { "TGFX16.SGX",     "EEMDO" MBCSEQ,       "/media/fat/_Console/TurboGrafx16_",       "/media/fat/games/TGFX16",       "sgx", },
   { "TI-99_4A",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
   { "TI-99_4A.D",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "/media/fat/games/TI-99_4A",     "bin", },
@@ -397,6 +393,12 @@ static int load_core(system_t* sys, char* corepath) {
   return 0;
 }
 
+static void get_link_path(system_t* sys, char* out, int size) {
+  char* sublink = sys->sublink;
+  if (NULL == sublink) sublink = ROMSUBLINK;
+  snprintf(out, size-1, "%s/%s/%s.%s", sys->romdir, sublink, MBC_LINK_NAM, sys->romext);
+}
+
 static int get_aux_rom_path(system_t* sys, char* out, int len){
   // Note: each directory will contain exactly one file
   // The extension is added to the folder too, for systems that may have
@@ -467,14 +469,17 @@ static int rom_link(system_t* sys, char* path) {
     return -1;
   }
 
-  if (mkdirpath(sys->romdir, 0777)){
-    PRINTERR("Rom path must be a directory: %s\n", sys->romdir);
+  char romdir[PATH_MAX] = {0};
+  get_link_path(sys, romdir, sizeof(romdir));
+
+  if (mkparent(romdir, 0777)){
+    PRINTERR("Rom path must be a directory: %s\n", romdir);
     return -1;
   }
 
   path_parentize(aux_dir_path);
-  if (filesystem_bind(aux_dir_path, sys->romdir)){
-    PRINTERR("Can not bind %s to %s\n", aux_dir_path, sys->romdir);
+  if (filesystem_bind(aux_dir_path, romdir)){
+    PRINTERR("Can not bind %s to %s\n", aux_dir_path, romdir);
     return -1;
   }
 
@@ -491,7 +496,10 @@ static int rom_unlink(system_t* sys) {
   int result;
   char aux_path[PATH_MAX] = {0};
 
-  snprintf(aux_path, sizeof(aux_path)-1, "%s/%s.%s", sys->romdir, MBC_LINK_NAM, sys->romext);
+  char* sublink = sys->sublink;
+  if (NULL == sublink) sublink = ROMSUBLINK;
+
+  get_link_path(sys, aux_path, sizeof(aux_path));
   result = filesystem_unbind(aux_path);
   if (result) {
     PRINTERR("Can not unbind %s\n", aux_path);
@@ -504,9 +512,7 @@ static int rom_unlink(system_t* sys) {
     return result;
   }
 
-  if (sys->opt | REMOVE_EMPTY_ROM_DIR){
-    if (rmdir(sys->romdir)) PRINTERR("Can not remove %s\n", sys->romdir);
-  }
+  if (rmdir(sys->romdir)) PRINTERR("Can not remove %s\n", sys->romdir);
 
   return result;
 }
