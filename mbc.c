@@ -137,13 +137,12 @@ static int mkparent(const char *path, mode_t mode) {
   return status;
 }
 
-// // Not used
-// static int mkdirpath(const char *path, mode_t mode) {
-//   if (is_dir(path)) return 0;
-//   int result = mkparent(path, mode);
-//   if (result) return result;
-//   return mkdir_core(path, mode);
-// }
+static int mkdirpath(const char *path, mode_t mode) {
+  if (is_dir(path)) return 0;
+  int result = mkparent(path, mode);
+  if (result) return result;
+  return mkdir_core(path, mode);
+}
 
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
@@ -174,7 +173,7 @@ static system_t system_list[] = {
   { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "/media/fat/games/Apple-II",     "dsk", },
   { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "bin", },
   { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "/media/fat/games/AQUARIUS",     "caq", },
-  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade/_ !MBC",     "mra", "_ !MBC"},
+  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade",            "mra", "_ !MBC"},
   { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "vhd", },
   { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
   { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "/media/fat/games/ARCHIE",       "img", },
@@ -400,16 +399,15 @@ static void get_link_path(system_t* sys, char* out, int size) {
 }
 
 static int get_aux_rom_path(system_t* sys, char* out, int len){
-  // Note: each directory will contain exactly one file
-  // The extension is added to the folder too, for systems that may have
-  // multiple rom extensione, e.g. the CUSTOM system.
   return (0>= snprintf(out, len, "/%s/%s.%s/%s.%s", MBC_TMP_DIR, sys->id, sys->romext, MBC_LINK_NAM, sys->romext));
 }
-
 
 #ifdef USE_MOUNT_POINTS
 
 static int create_aux_rom_file(system_t* sys, char* path){
+  // Note: each directory will contain exactly one file
+  // The extension is added to the folder too, for systems that may have
+  // multiple rom extensione, e.g. the CUSTOM system.
   char aux_dir_path[PATH_MAX] = {0};
   int result = get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
   if (result) return result;
@@ -454,10 +452,6 @@ static int rom_link(system_t* sys, char* path) {
   // NeoGeo shows the roms by an internal name, not the file one.  So the
   // best way to handle the rom-dir is to bind it to another dir containing
   // just one file.
-  //
-  // This file can not be a link since realpath was reported to have issue with
-  // CIFS mounts, and handling relative link by hand is cumbersome. So we use
-  // a bind for this file too.
 
   char aux_dir_path[PATH_MAX] = {0};
   get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
@@ -480,6 +474,7 @@ static int rom_link(system_t* sys, char* path) {
     return -1;
   }
 
+  path_parentize(romdir);
   path_parentize(aux_dir_path);
   if (filesystem_bind(aux_dir_path, romdir)){
     PRINTERR("Can not bind %s to %s\n", aux_dir_path, romdir);
@@ -509,13 +504,14 @@ static int rom_unlink(system_t* sys) {
     return result;
   }
 
-  result = filesystem_unbind(sys->romdir);
+  path_parentize(aux_path);
+  result = filesystem_unbind(aux_path);
   if (result) {
-    PRINTERR("Can not unbind %s\n", sys->romdir);
+    PRINTERR("Can not unbind %s\n", aux_path);
     return result;
   }
 
-  if (rmdir(sys->romdir)) PRINTERR("Can not remove %s\n", sys->romdir);
+  if (rmdir(aux_path)) PRINTERR("Can not remove %s\n", sys->romdir);
 
   return result;
 }
@@ -543,6 +539,11 @@ static int rom_unlink(system_t* sys) {
 
 static int rom_link(system_t* sys, char* path) {
 
+  // Some cores do not simply list the content of the rom-dir. For example the
+  // NeoGeo shows the roms by an internal name, not the file one.  So the
+  // best way to handle the rom-dir is to bind it to another dir containing
+  // just one file.
+
   rom_unlink(sys); // It is expected that this can fail in some cases
 
   char rompath[PATH_MAX] = {0};
@@ -567,7 +568,6 @@ static int rom_link(system_t* sys, char* path) {
 
   return 0;
 }
-
 
 #endif // USE_MOUNT_POINTS
 
