@@ -33,11 +33,13 @@ arm-linux-gnueabihf-gcc -std=c99 -static -DUSE_MOUNT_POINT -D_XOPEN_SOURCE=700 -
 
 # Support
 
-Some functionalities need specific support for each cores. You can experiment
-with non supported core using the `CUSTOM` system: it is configurable as
-described in the `list_core` command section.  If you make a system work in
-this way, please open a github issue specifying the value of the variables,
-so the its support can be easly added.
+Some functionalities need specific support for each system.  To handle
+not-supported or non-standard cases, the `CUSTOM` system is provided. It let
+you, for example, to freely set the game directory, the symulated key sequence,
+etc.  It is configured with the environment variables specified in the
+`list_core` command section.  If you make a system work in this way, please
+open a github issue specifying the value of the variables, so its support can
+be easly added.
 
 Please note that these informations could change from one release of the MiSTer
 to another, so please, make sure you are referring to the last release. If the
@@ -65,6 +67,7 @@ Readme.
 Some commands need specific support for each cores. A special system `CUSTOM`
 is provided to try to launch unsupported core. See documentation of the `list_core`
 for more details.
+
 
 ## Command raw_seq
 
@@ -106,6 +109,20 @@ variables:
   sequence; the default is 1000.
 
 
+## Command load_rom
+
+```
+mbc load_rom SYSTEM /PATH/TO/ROM
+```
+
+This will load the default core associated to the `SYSTEM`, then it will load
+the rom passed as argument. The supported systems can be retrieved with the
+`list_core` command.
+
+The games can be loaded from any directory, but the default one MUST exist
+(e.g. /media/fat/games/NES). It can be empty.
+
+
 ## Command list_core
 
 ```
@@ -129,16 +146,6 @@ following environment variables:
 - `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
   `MBC_CUSTOM_ROM_EXT=nes`
 
-## Command load_rom
-
-```
-mbc load_rom SYSTEM /PATH/TO/ROM
-```
-
-This will load the default core associated to the `SYSTEM`, then it will load
-the rom passed as argument. The supported systems can be retrieved with the
-`list_core` command.
-
 
 ## Command list_content
 
@@ -146,9 +153,13 @@ the rom passed as argument. The supported systems can be retrieved with the
 mbc list_content
 ```
 
-It will list all the rom in the default MiSTer directories. Each rome is
-preceded by the system name and a space. The system name is upper case and has
-no spaces.
+It will list all the games in the default directory. Each game is preceded by
+the system name and a space. The system name is upper case and has no spaces.
+
+Please note that the directory is not recursivelly searched; linux has better
+tools for such purpose. This command is meant just to give a quick feedback
+of the `mbc` functionalities.
+
 
 ## Command load_all_as
 
@@ -159,6 +170,7 @@ mbc load_all_as SYSTEM /PATH/TO/CORE /PATH/TO/ROM
 This is similar to `load_rom` but it will use the core provaided as argument
 instead of the default one.
 
+
 ## Command load_all
 
 ```
@@ -168,6 +180,7 @@ mbc load_all /PATH/TO/CORE /PATH/TO/ROM
 This is similar to the `load_all_as` command, but it tries to match the system
 from the core file name.
 
+
 ## Command stream
 
 ```
@@ -175,6 +188,7 @@ mbc stream
 ```
 
 It will open the standard input, and will execute each line as a single command.
+
 
 ## TODO : document other commands !
 
