@@ -140,8 +140,8 @@ following environment variables:
 - `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file, e.g.
   `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
 
-- `MBC_CUSTOM_ROM_PATH` is the path of the default rom
-  directory, e.g. `MBC_CUSTOM_ROM_PATH=/media/fat/games/NES`
+- `MBC_CUSTOM_FOLDER` is the name of the folders that are related to the system,
+   e.g. `MBC_CUSTOM_ROM_PATH=NES`
 
 - `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
   `MBC_CUSTOM_ROM_EXT=nes`
