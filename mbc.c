@@ -396,11 +396,48 @@ static int load_core(system_t* sys, char* corepath) {
   return 0;
 }
 
+// This MUST BE KEPT IN SYNC with the findPrefixDir function of the Main_MiSTer (file_io.cpp)
+//
+int findPrefixDirAux(const char* path, char *dir, size_t dir_len){
+  char temp_dir[dir_len+1];
+	if (0> snprintf(temp_dir, dir_len, "%s/%s", path, dir)) return 0;
+  struct stat sb;
+  if (stat(temp_dir, &sb)) return 0;
+  if (!S_ISDIR(sb.st_mode)) return 0;
+	if (0> snprintf(dir, dir_len, "%s", temp_dir)) return 0;
+  return 1;
+}
+int findPrefixDir(char *dir, size_t dir_len){
+
+  if (findPrefixDirAux("/media/usb0", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb0/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb1", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb1/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb2", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb2/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb3", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb3/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb4", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb4/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb5", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb5/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb6", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/usb6/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/fat/cifs", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/fat/cifs/games", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/fat", dir, dir_len)) return 1;
+  if (findPrefixDirAux("/media/fat/games", dir, dir_len)) return 1;
+
+	return 0;
+}
+
 static void get_base_path(system_t* sys, char* out, int size) {
   if ('/' == sys->fsid[0]) {
     snprintf(out, size-1, "%s", sys->fsid);
   } else {
-    snprintf(out, size-1, "/media/fat/games/%s", sys->fsid);
+    snprintf(out, size-1, "%s", sys->fsid);
+    if (!findPrefixDir(out, size))
+      snprintf(out, size-1, "/media/fat/games/%s", sys->fsid); // fallback
   }
 }
 
