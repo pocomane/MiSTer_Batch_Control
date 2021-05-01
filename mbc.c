@@ -10,8 +10,6 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/select.h>
-#include <sys/inotify.h>
 #include <fcntl.h>
 #include <sys/mount.h>
 #include <linux/uinput.h>
@@ -379,6 +377,16 @@ static int load_core(system_t* sys, char* corepath) {
     return -1;
   }
   
+  while (1) {
+    int tmp = open(MISTER_COMMAND_DEVICE, O_WRONLY|O_NONBLOCK);
+    if (0<= tmp) {
+      close(tmp);
+      break;
+    }
+    LOG("%s\n", "can not access the MiSTer command fifo; retrying");
+    msleep(1000);
+  }
+
   FILE* f = fopen(MISTER_COMMAND_DEVICE, "wb");
   if (0 == f) {
     PRINTERR("%s\n", MISTER_COMMAND_DEVICE);
