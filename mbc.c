@@ -13,6 +13,8 @@
 #include <fcntl.h>
 #include <sys/mount.h>
 #include <linux/uinput.h>
+#include <sys/inotify.h>
+#include <poll.h>
 
 #define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
@@ -23,7 +25,7 @@
 #define MBCSEQ "HDOFO"
 #define ROMSUBLINK " !MBC"
 
-#define HAS_PREFIX(P, N) (!strncmp(P, n, sizeof(P)-1)) // P must be a string literal
+#define HAS_PREFIX(P, N) (!strncmp(P, N, sizeof(P)-1)) // P must be a string literal
 
 #define ARRSIZ(A) (sizeof(A)/sizeof(A[0]))
 #define LOG(F,...) printf("%d - " F, __LINE__, __VA_ARGS__ )
@@ -144,6 +146,87 @@ static int mkdirpath(const char *path, mode_t mode) {
   int result = mkparent(path, mode);
   if (result) return result;
   return mkdir_core(path, mode);
+}
+
+typedef struct {
+  int watcher;
+  int file_n;
+  struct pollfd pool[99];
+} input_monitor;
+
+int user_input_poll(input_monitor*monitor, int ms){
+  int result = poll(monitor->pool, monitor->file_n, ms);
+  if (0> result) return -4; // Poll error
+  return result;
+}
+
+int user_input_clear(input_monitor*monitor){
+  struct input_event ev;
+  int count = 0;
+  while (0< user_input_poll(monitor, 1))
+    for (int f = 0; f < monitor->file_n; f += 1)
+      if (monitor->pool[f].revents & POLLIN)
+        if (0< read(monitor->pool[f].fd, &ev, sizeof(ev)))
+          count += 1;
+  return count;
+}
+
+int user_input_open(input_monitor*monitor){
+  const char folder[] = "/dev/input";
+
+  monitor->watcher = -1;
+  monitor->file_n = 0;
+
+  int inotify_fd = inotify_init();
+  if (inotify_fd == -1) return -1; // Inotify error
+
+  monitor->pool[monitor->file_n].fd = inotify_fd;
+  monitor->pool[monitor->file_n].events = POLLIN;
+  monitor->file_n += 1;
+
+  monitor->watcher = inotify_add_watch( inotify_fd, folder, IN_CREATE | IN_DELETE );
+  if (monitor->watcher == -1) return -2; // Watcher error
+
+  struct dirent* dir = NULL;
+  DIR* dirinfo = opendir(folder);
+  if (dirinfo != NULL) {
+    while (0 != (dir = readdir (dirinfo))){
+      if (HAS_PREFIX("event", dir->d_name)){
+
+        char out[sizeof(folder)+strlen(dir->d_name)+9];
+        snprintf(out, sizeof(out)-1, "%s/%s", folder,dir->d_name);
+        struct stat fileinfo;
+        if (stat(out, &fileinfo) == 0 && !S_ISDIR(fileinfo.st_mode) && !S_ISREG(fileinfo.st_mode)) {
+
+          if (monitor->file_n >= sizeof(monitor->pool)/sizeof(*(monitor->pool))) break;
+          int fd = open(out,O_RDONLY|O_NONBLOCK);
+          if (fd <= 0) return -3; // Open error
+
+          monitor->pool[monitor->file_n].fd = fd;
+          monitor->pool[monitor->file_n].events = POLLIN;
+          monitor->file_n += 1;
+        }
+      }
+    }
+    closedir(dirinfo);
+  }
+
+  while(0< user_input_clear(monitor)); // drop old events
+
+  return 0;
+}
+
+int is_user_input_event(int code){ return (code>0); }
+int is_user_input_timeout(int code){ return (code==0); }
+
+void user_input_close(input_monitor*monitor){
+
+  if (monitor->watcher >= 0)
+    inotify_rm_watch(monitor->pool[0].fd, monitor->watcher);
+
+  for (int f = 0; f < monitor->file_n; f += 1)
+    if (monitor->pool[f].fd > 0) close(monitor->pool[f].fd);
+  monitor->file_n = 0;
 }
 
 typedef struct {
@@ -788,6 +871,37 @@ int list_content(){
   return 0;
 }
 
+int monitor_user_input(int single, char* ms){
+
+  int timeout;
+  if (0> sscanf(ms, "%d", &timeout)){
+    printf("error\n");
+    return -1;
+  }
+  input_monitor monitor;
+  int result = user_input_open(&monitor);
+  if (result) goto end;
+
+  for (int c = 1; 1;){
+
+    result = user_input_poll(&monitor, timeout);
+    if (!single) c += user_input_clear(&monitor);
+
+    if (is_user_input_timeout(result)) printf("timeout\n");
+    else if (is_user_input_event(result)) printf("event catched %d\n", c);
+
+    if (single) break;
+  }
+  goto end;
+
+end:
+  user_input_close(&monitor);
+  if (!is_user_input_timeout(result) && ! is_user_input_event(result))
+    PRINTERR("input monitor error %d\n", result);
+
+  return 0;
+}
+
 static int stream_mode();
 
 // command list
@@ -806,6 +920,8 @@ static void cmd_select_seq(int argc, char** argv)   { if(checkarg(1,argc))emulat
 static void cmd_rom_unlink(int argc, char** argv)   { if(checkarg(1,argc))rom_unlink(get_system(NULL,argv[1])); }
 static void cmd_list_content(int argc, char** argv) { list_content(); }
 static void cmd_list_rom_for(int argc, char** argv) { if(checkarg(1,argc))list_content_for(get_system(NULL,argv[1])); }
+static void cmd_wait_input(int argc, char** argv)   { if(checkarg(1,argc))monitor_user_input(1,argv[1]); }
+static void cmd_catch_input(int argc, char** argv)  { if(checkarg(1,argc))monitor_user_input(0,argv[1]); }
 //
 struct cmdentry cmdlist[] = {
   //
@@ -813,6 +929,7 @@ struct cmdentry cmdlist[] = {
   // The array must be lexicographically sorted wrt "name" field (e.g.
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
   //
+  {"catch_input"  , cmd_catch_input  , } ,
   {"done"         , cmd_exit         , } ,
   {"list_content" , cmd_list_content , } ,
   {"list_core"    , cmd_list_core    , } ,
@@ -828,6 +945,7 @@ struct cmdentry cmdlist[] = {
   {"rom_unlink"   , cmd_rom_unlink   , } ,
   {"select_seq"   , cmd_select_seq   , } ,
   {"stream"       , cmd_stream_mode  , } ,
+  {"wait_input"   , cmd_wait_input   , } ,
 };
 
 static int run_command(int narg, char** args) {

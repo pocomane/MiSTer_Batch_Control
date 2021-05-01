@@ -181,6 +181,32 @@ This is similar to the `load_all_as` command, but it tries to match the system
 from the core file name.
 
 
+## Command catch_input
+
+```
+mbc catch_input TIMEOUT_MS
+```
+
+Each time a button is pressed a `event catched` will be printed, plus an event
+counter. If no event was found within a certain time, `timeout` will be
+printed. The timeout time is specified in milliseconds and if it is negative,
+no timeout is set and `timeout` will be never printed.
+
+Please note that the `MiSTer` main app opens all the inputs in exclusive mode.
+This means that while it is running, `mbc` will not see any event. To use this
+command the `MiSTer` main app must be stopped (and then restarted after the exit of
+`mbc`). An example is in the `example/demomode.sh` script.
+
+## Command wait_input
+
+```
+mbc wait_input TIMEOUT_MS
+```
+
+This is similar to `catch_input` command, but it exits after the first event or
+timeout.  Same attention of `catch_input` command should be paid when operating
+with the `MiSTer` app.
+
 ## Command stream
 
 ```
