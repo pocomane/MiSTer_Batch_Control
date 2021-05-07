@@ -76,28 +76,38 @@ mbc raw_seq KEY_SEQUENCE
 ```
 
 This command will emulate the key press and release as described in the
-`KEY_SEQUENCE`. It must be an uppercase string containig just the following
-characters:
+`KEY_SEQUENCE`. It is a sequence of the following codes with the following
+meanings:
 
-- U - Up arrow
-- D - Down arrow
-- L - Left arrow
-- R - Right arrow
-- O - Enter (Open)
-- E - ESC
-- H - Home
-- F - End (Finish)
-- M - F12 (Menu)
+- U - press and release up arrow
+- D - press and release down arrow
+- L - press and release left arrow
+- R - press and release right arrow
+- O - press and release enter (Open)
+- E - press and release esc
+- H - press and release home
+- F - press and release end (Finish)
+- M - press and release F12 (Menu)
+- Lowercase letters (a-z) or digits (0-9) - press and release of the corresponding key
+- :XX - press and release of the key with the hex code XX
+- {XX - press of the key with the hex code XX
+- }XX - release of the key with the hex code XX
 
-For example, the command
+The `XX` value is the hex representition of the coded in the
+[uapi/input-event-code](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)
+kernel header.
+
+For example, the commands
 
 ```
 mbc raw_seq EEMDDO
+mbc raw_seq :01:01:58:6C:6C:1C
 ```
 
-sends Esc, Esc, F12, down, dowm, enter, so it selects the third item of the
-menu. The timing can be configured by means of the following environment
-variables:
+do the same thing: they send Esc, Esc, F12, down, dowm, enter, so they select
+the third item of the menu.
+
+The timing can be configured by means of the following environment variables:
 
 - `MBC_CORE_WAIT` sets the number of milliseconds to wait for the core to be loaded;
   the default is 3000.

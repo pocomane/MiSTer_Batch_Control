@@ -354,13 +354,112 @@ int core_wait = 3000; // ms
 int inter_key_wait = 40; // ms
 int sequence_wait = 1000; // ms
 
-static void emulate_key(int fd, int key) {
+static void emulate_key_press(int fd, int key) {
   msleep(inter_key_wait);
   ev_emit(fd, EV_KEY, key, 1);
   ev_emit(fd, EV_SYN, SYN_REPORT, 0);
-  msleep(50);
+}
+
+static void emulate_key_release(int fd, int key) {
+  msleep(inter_key_wait);
   ev_emit(fd, EV_KEY, key, 0);
   ev_emit(fd, EV_SYN, SYN_REPORT, 0);
+}
+
+static void emulate_key(int fd, int key) {
+  emulate_key_press(fd, key);
+  emulate_key_release(fd, key);
+}
+
+#define TAG_KEY_PRESS   '{'
+#define TAG_KEY_RELEASE '}'
+#define TAG_KEY_FULL    ':'
+
+static char* parse_hex_byte(char* seq, int* code, int* tag){
+  int c, n;
+  if (0> sscanf(seq, "%2x%n", &c, &n) || 2!= n) return 0;
+  if (code) *code = c;
+  if (tag) *tag = TAG_KEY_FULL;
+  return seq+n;
+}
+
+static char* parse_tagged_byte(char* seq, int* code, int* tag){
+  if (tag) *tag = *seq; // any single char tag is valid (action support is checked by the caller)
+  if (seq[1] == '\0') return 0;
+  return parse_hex_byte(seq+1, code, 0);
+}
+
+static char* parse_alphanumeric_key(char* seq, int* code, int* tag){
+  int i = 0; if (!code) code = &i;
+  switch (*seq) {
+    default: return 0;
+
+    break;case '0': *code = KEY_0;
+    break;case '1': *code = KEY_1;
+    break;case '2': *code = KEY_2;
+    break;case '3': *code = KEY_3;
+    break;case '4': *code = KEY_4;
+    break;case '5': *code = KEY_5;
+    break;case '6': *code = KEY_6;
+    break;case '7': *code = KEY_7;
+    break;case '8': *code = KEY_8;
+    break;case '9': *code = KEY_9;
+    break;case 'a': *code = KEY_A;
+    break;case 'b': *code = KEY_B;
+    break;case 'c': *code = KEY_C;
+    break;case 'd': *code = KEY_D;
+    break;case 'e': *code = KEY_E;
+    break;case 'f': *code = KEY_F;
+    break;case 'g': *code = KEY_G;
+    break;case 'h': *code = KEY_H;
+    break;case 'i': *code = KEY_I;
+    break;case 'j': *code = KEY_J;
+    break;case 'k': *code = KEY_K;
+    break;case 'l': *code = KEY_L;
+    break;case 'm': *code = KEY_M;
+    break;case 'n': *code = KEY_N;
+    break;case 'o': *code = KEY_O;
+    break;case 'p': *code = KEY_P;
+    break;case 'q': *code = KEY_Q;
+    break;case 'r': *code = KEY_R;
+    break;case 's': *code = KEY_S;
+    break;case 't': *code = KEY_T;
+    break;case 'u': *code = KEY_U;
+    break;case 'v': *code = KEY_V;
+    break;case 'w': *code = KEY_W;
+    break;case 'x': *code = KEY_X;
+    break;case 'y': *code = KEY_Y;
+    break;case 'z': *code = KEY_Z;
+  }
+  if (tag) *tag = TAG_KEY_FULL;
+  return seq+1;
+}
+
+static char* parse_special_key(char* seq, int* code, int* tag){
+  int i = 0; if (!code) code = &i;
+  switch (*seq) {
+    default: return 0;
+
+    break;case 'U': *code = KEY_UP;    // 103 0x67 up
+    break;case 'D': *code = KEY_DOWN;  // 108 0x6c down
+    break;case 'L': *code = KEY_LEFT;  // 105 0x69 left
+    break;case 'R': *code = KEY_RIGHT; // 106 0x6a right
+    break;case 'O': *code = KEY_ENTER; //  28 0x1c enter (Open)
+    break;case 'E': *code = KEY_ESC;   //   1 0x01 esc
+    break;case 'H': *code = KEY_HOME;  // 102 0x66 home
+    break;case 'F': *code = KEY_END;   // 107 0x6b end (Finish)
+    break;case 'M': *code = KEY_F12;   //  88 0x58 f12 (Menu)
+  }
+  if (tag) *tag = TAG_KEY_FULL;
+  return seq+1;
+}
+
+static char* parse_key_sequence(char* seq, int* code, int* tag){
+  char *next;
+  if (0!=( next = parse_alphanumeric_key(seq, code, tag) )) return next;
+  if (0!=( next = parse_special_key(seq, code, tag) )) return next;
+  if (0!=( next = parse_tagged_byte(seq, code, tag) )) return next;
+  return 0;
 }
 
 static int emulate_sequence(char* seq) {
@@ -373,22 +472,21 @@ static int emulate_sequence(char* seq) {
   // Wait that userspace detects the new device
   msleep(sequence_wait);
 
-  // Emulate sequence
-  for (int i=0; i<strlen(seq); i++) {
-    switch (seq[i]) {
-      default:
-        close(fd);
-        return -1;
+  while (seq && '\0' != *seq) {
+    int code = 0, tag = 0;
 
-      break;case 'U': emulate_key(fd, KEY_UP);    // 103 0x67 up
-      break;case 'D': emulate_key(fd, KEY_DOWN);  // 108 0x6c down
-      break;case 'L': emulate_key(fd, KEY_LEFT);  // 105 0x69 left
-      break;case 'R': emulate_key(fd, KEY_RIGHT); // 106 0x6a right
-      break;case 'O': emulate_key(fd, KEY_ENTER); //  28 0x1c enter (Open)
-      break;case 'E': emulate_key(fd, KEY_ESC);   //   1 0x01 esc
-      break;case 'H': emulate_key(fd, KEY_HOME);  // 102 0x66 home
-      break;case 'F': emulate_key(fd, KEY_END);   // 107 0x6b end (Finish)
-      break;case 'M': emulate_key(fd, KEY_F12);   //  88 0x58 f12 (Menu)
+    // Parse the sequence
+    char* newseq = parse_key_sequence(seq, &code, &tag);
+    if (0 == newseq || seq == newseq) goto err; // can not parse
+    seq = newseq;
+
+    // Emulate the keyboard event
+    switch (tag) {
+      default: goto err; // unsupported action
+
+      break;case TAG_KEY_FULL: emulate_key(fd, code);
+      break;case TAG_KEY_PRESS: emulate_key_press(fd, code);
+      break;case TAG_KEY_RELEASE: emulate_key_release(fd, code);
     }
   }
 
@@ -396,8 +494,11 @@ static int emulate_sequence(char* seq) {
   msleep(sequence_wait);
 
   ev_close(fd);
-
   return 0;
+
+err:
+  ev_close(fd);
+  return -1;
 }
 
 static char* after_string(char* str, char delim) {
