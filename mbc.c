@@ -645,8 +645,6 @@ static void get_link_path(system_t* sys, char* out, int size) {
   }
 }
 
-#ifdef USE_MOUNT_POINTS
-
 static int get_aux_rom_path(system_t* sys, char* out, int len){
   return (0>= snprintf(out, len, "/%s/%s.%s/%s.%s", MBC_TMP_DIR, sys->id, sys->romext, MBC_LINK_NAM, sys->romext));
 }
@@ -696,9 +694,23 @@ static int filesystem_unbind(const char* path) {
 static int rom_link(system_t* sys, char* path) {
 
   // Some cores do not simply list the content of the rom-dir. For example the
-  // NeoGeo shows the roms by an internal name, not the file one.  So the
-  // best way to handle the rom-dir is to bind it to another dir containing
-  // just one file.
+  // NeoGeo shows the roms by an internal name, not the file one.  So the best
+  // way to handle the rom-dir is to create an temporary sub-dir containing
+  // just one file. The dir must have a name that place it as the first item of
+  // the list.
+  //
+  // Moreover the core base directory could be on a filesystem without symbolic
+  // links support (e.g. vfat in /media/usb0), so we have to bind-mount a
+  // feature-full fs in the temporary directory. The bind-mount removal will
+  // fail until the MiSTer main app ends the loading
+  //
+  // Once bind-mounted, whe have two options:
+  //   1) create a link to the desired (we need to use realpath to allow link
+  //      created from any working-dir)
+  //   2) make another bind-mount to the target file;
+  //
+  // Here we use the system 2)
+  //
 
   char aux_dir_path[PATH_MAX] = {0};
   get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
@@ -761,58 +773,6 @@ static int rom_unlink(system_t* sys) {
 
   return result;
 }
-
-
-#else // USE_MOUNT_POINTS
-
-static int rom_unlink(system_t* sys) {
-  char rompath[PATH_MAX] = {0};
-
-  get_link_path(sys, rompath, sizeof(rompath));
-  if (unlink(rompath)) return -1;
-
-  path_parentize(rompath);
-  rmdir(rompath); // No issue if error
-  path_parentize(rompath);
-  rmdir(rompath); // No issue if error
-
-  return 0;
-}
-
-static int rom_link(system_t* sys, char* path) {
-
-  // Some cores do not simply list the content of the rom-dir. For example the
-  // NeoGeo shows the roms by an internal name, not the file one.  So the
-  // best way to handle the rom-dir is to bind it to another dir containing
-  // just one file.
-
-  rom_unlink(sys); // It is expected that this can fail in some cases
-
-  char rompath[PATH_MAX] = {0};
-  get_link_path(sys, rompath, sizeof(rompath));
-
-  if (mkparent(rompath, 0777) < 0) {
-    PRINTERR("Can not create %s parent directory\n", rompath);
-    return -1;
-  }
-
-  char* rpath = realpath(path, 0);
-  if (!rpath) {
-    PRINTERR("Can not resolve %s\n", path);
-    return -1;
-  }
-
-  int ret = symlink(rpath, rompath);
-  if (0 != ret) {
-    PRINTERR("Can not link %s -> %s\n", rompath, rpath);
-    return -1;
-  }
-
-  return 0;
-}
-
-
-#endif // USE_MOUNT_POINTS
 
 static int emulate_system_sequence(system_t* sys) {
   if (NULL == sys) {

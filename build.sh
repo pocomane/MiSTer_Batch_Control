@@ -21,8 +21,6 @@ fi
 
 echo "building..."
 cd build
-arm-linux-musleabihf-gcc -std=c99 -Wall -DUSE_MOUNT_POINTS -D_XOPEN_SOURCE=700 -static -O2 -o mbc_mnt ../mbc.c ||die
-arm-linux-musleabihf-strip mbc_mnt ||die
 arm-linux-musleabihf-gcc -std=c99 -Wall -D_XOPEN_SOURCE=700 -static -O2 -o mbc ../mbc.c ||die
 arm-linux-musleabihf-strip mbc ||die
 mkdir -p hook/expose ||die
