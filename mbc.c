@@ -1087,13 +1087,21 @@ static void read_options(int argc, char* argv[]) {
     val = getenv("MBC_CUSTOM_ROM_EXT");
     if (NULL != val && val[0] != '\0') custom_system->romext = strdup(val);
 
+    val = getenv("MBC_CUSTOM_LINK");
+    int custom_link = 0;
+    if (NULL != val && val[0] != '\0') {
+      custom_link = 1;
+      custom_system->sublink = strdup(val);
+    }
+
     val = getenv("MBC_CUSTOM_SEQUENCE");
     if (NULL != val && val[0] != '\0') {
       int siz = strlen(val);
       char* seq = malloc(siz + strlen(MBCSEQ) +1);
       if (seq) {
         strcpy(seq, val);
-        strcpy(seq + siz, MBCSEQ);
+        if (!custom_link)
+          strcpy(seq + siz, MBCSEQ);
       }
       custom_system->menuseq = seq;
     }

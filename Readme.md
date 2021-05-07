@@ -148,6 +148,12 @@ following environment variables:
 - `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
   `MBC_CUSTOM_ROM_EXT=nes`
 
+- `MBC_CUSTOM_LINK` is the position of the temporary rom link; if it is present
+   the `MBC_CUSTOM_SEQUENCE` must be the sequence to select the exact item, not
+   just to open the menu, e.g.
+   `MBC_CUSTOM_LINK="/media/fat/games/NES/ !MBC/~~~/nes"` and
+   `MBC_CUSTOM_SEQUENCE=EEMO`
+
 
 ## Command list_content
 
