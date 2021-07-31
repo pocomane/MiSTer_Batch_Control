@@ -670,13 +670,13 @@ static void get_base_path(system_t* sys, char* out, int size) {
   }
 }
 
-static void get_link_path(system_t* sys, char* out, int size) {
+static void get_link_path(system_t* sys, const char* filename, char* out, int size) {
   if (NULL != sys->sublink) {
     snprintf(out, size-1, "%s", sys->sublink);
   } else {
     get_base_path(sys, out, size);
     int dl = strlen(out);
-    snprintf(out+dl, size-dl-1, "/%s/%s.%s", ROMSUBLINK, MBC_LINK_NAM, sys->romext);
+    snprintf(out+dl, size-dl-1, "/%s/%s.%s", ROMSUBLINK, filename?filename:MBC_LINK_NAM, sys->romext);
   }
 }
 
@@ -737,8 +737,14 @@ static int rom_link(system_t* sys, char* path) {
   // Here we use the system 2)
   //
 
+  char filename[strlen(path)];
+  filename[0] = '\0';
+  strcpy(filename, after_string(path, '/'));
+  char* ext = after_string(filename,'.');
+  if (ext > filename+1) *(ext-1) = '\0';
+
   char linkpath[PATH_MAX] = {0};
-  get_link_path(sys, linkpath, sizeof(linkpath));
+  get_link_path(sys, filename, linkpath, sizeof(linkpath));
 
   if (create_file(linkpath)) {
     PRINTERR("Can not create rom link file or folder %s\n", linkpath);
@@ -766,11 +772,28 @@ static int rom_unlink(system_t* sys) {
   int result;
   char aux_path[PATH_MAX] = {0};
 
-  get_link_path(sys, aux_path, sizeof(aux_path));
-  if (!filesystem_unbind(aux_path) && is_empty_file(aux_path))
-    remove(aux_path);
-
+  get_link_path(sys, NULL, aux_path, sizeof(aux_path));
   path_parentize(aux_path);
+
+  struct dirent* ep = NULL;
+  DIR* dp = opendir(aux_path);
+  if (dp != NULL) {
+    while (0 != (ep = readdir (dp))){
+      if (!strcmp(".",ep->d_name) || !strcmp("..",ep->d_name))
+        continue;
+      char p[PATH_MAX] = {0};
+      snprintf(p, sizeof(p), "%s/%s", aux_path, ep->d_name);
+      if (!filesystem_unbind(p) && is_empty_file(p))
+        remove(p);
+    }
+  }
+
+  result = filesystem_unbind(aux_path);
+  if (result) {
+    PRINTERR("Can not unbind %s\n", aux_path);
+    return result;
+  }
+
   rmdir(aux_path); // No issue if error
 
   return result;
