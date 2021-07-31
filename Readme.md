@@ -2,7 +2,7 @@
 # MiSTer Batch control
 
 This is a simple command line utility to control the [MiSTer
-fpga](https://github.com/MiSTer-devel)). It main purpose is to load ROM files
+fpga](https://github.com/MiSTer-devel). Its main purpose is to load ROM files
 since this features is not supported by the MiSTer out of the box.
 
 # Installation
