@@ -788,12 +788,6 @@ static int rom_unlink(system_t* sys) {
     }
   }
 
-  result = filesystem_unbind(aux_path);
-  if (result) {
-    PRINTERR("Can not unbind %s\n", aux_path);
-    return result;
-  }
-
   rmdir(aux_path); // No issue if error
 
   return result;
