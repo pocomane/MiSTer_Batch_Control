@@ -32,6 +32,39 @@
 #define PRINTERR(F,...) LOG("error - %s - " F, strerror(errno ? errno : EPERM), __VA_ARGS__ )
 #define SBSEARCH(T, SA, C)	(bsearch(T, SA, sizeof(SA)/sizeof(SA[0]), sizeof(SA[0]), (C)))
 
+#ifdef FAKE_OS_OPERATION
+#define nanosleep(m,n) (LOG("nanosleep %ld %ld\n", (m)->tv_sec, (m)->tv_nsec), 0)
+#define open(p,b)      (LOG("open '%s'\n", p), fake_fd(p))
+#define ioctl(f,...)   (0)
+#define write(f,d,s)   (LOG("write '%s' <-",f),hex_write(d,s),printf("\n"), 0)
+#define close(f)       (LOG("close '%s'\n",fake_fd_name(f)), 0)
+#define mkdir(p,m)     (LOG("mkdir '%s'\n",p), 0)
+#define poll(p,n,m)    (LOG("%s\n","poll"), 0)
+#define read(f,d,s)    (LOG("read '%s'\n",fake_fd_name(f)), 0)
+#define inotify_init() (LOG("%s\n","inotifyinit"), 0)
+#define inotify_add_watch(f,d,o)   (LOG("inotifyadd '%s'\n",fake_fd_name(f)), 0)
+//#define opendir(p)     (LOG("opendir '%s'\n",p), fake_fd(p))
+//#define readdir(f)     (LOG("readdir '%s'\n",fake_fd_name(f)), 0)
+#define closedir(f)    (LOG("closedir '%s'\n",fake_fd_name(f)), 0)
+#define inotify_rm_watch(f,w)   (LOG("inotifyrm '%s'\n",fake_fd_name(f)), 0)
+#define fopen(p,o)     (LOG("fopen '%s'\n",p), fake_file(p))
+#define fprintf(f,m,d) (LOG("fprintf '%s' <- '%s'\n",fake_file_name(f),m), 0)
+#define fclose(f)      (LOG("fclose '%s'\n",fake_file_name(f)), 0)
+#define mount(s,t,x,o, y)    (LOG("mount '%s' -> '%s'\n",s,t), 0)
+#define umount(p)      (LOG("umount '%s'\n",p), 0)
+#define remove(p)      (LOG("remove '%s'\n",p), 0)
+#define rmdir(p)       (LOG("rmdir '%s'\n",p), 0)
+//#define stat(p,s)      (LOG("stat '%s'\n",p), stat(p,s))
+//#define getenv(k)      (LOG("getenv '%s'\n",k),getenv(k))
+#undef S_ISREG
+#define S_ISREG(s)      (1)
+static int   fake_fd(const char* name)    { return (int)(char*)strdup(name); }
+static char* fake_fd_name(int fd)         { return (char*)fd; }
+static FILE* fake_file(const char* name)  { return (FILE*)(char*)strdup(name); }
+static char* fake_file_name(FILE* f)      { return (char*)f; }
+static void  hex_write(const char*b,int s){ for(int i=0;i<s;i+=1)printf(" %02x",b[i]); }
+#endif // FAKE_OS_OPERATION
+
 static void msleep(long ms){
   struct timespec w;
   w.tv_sec = ms / 1000;
