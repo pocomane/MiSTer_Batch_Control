@@ -718,23 +718,25 @@ static int filesystem_unbind(const char* path) {
 
 static int rom_link(system_t* sys, char* path) {
 
-  // Some cores do not simply list the content of the rom-dir. For example the
-  // NeoGeo shows the roms by an internal name, not the file one.  So the best
-  // way to handle the rom-dir is to create an temporary sub-dir containing
-  // just one file. The dir must have a name that place it as the first item of
-  // the list.
   //
-  // Moreover the core base directory could be on a filesystem without symbolic
-  // links support (e.g. vfat in /media/usb0), so we have to bind-mount a
-  // feature-full fs in the temporary directory. The bind-mount removal will
-  // fail until the MiSTer main app ends the loading
+  // We will make some folder and file that will appear in the MiSTer file
+  // selection menu. In order to let this items to be automatically selected by
+  // the emulated key sequence, a folder is created in the rom directory with a
+  // name that places it at very beginning of the list. Moreover such folder
+  // will always contain a single file to be selected.
   //
-  // Once bind-mounted, whe have two options:
-  //   1) create a link to the desired (we need to use realpath to allow link
-  //      created from any working-dir)
-  //   2) make another bind-mount to the target file;
+  // We need the auxiliary folder since some cores do not simply sort the item
+  // by the file name, for example the NeoGeo shows the roms by an internal
+  // name. So using a simple file inside the rom directory will not suffice to
+  // make such item automatically selected because we can not predict where it
+  // is placed in the list.
   //
-  // Here we use the system 2)
+  // Moreover, we can not use symbolyc links to link the auxiliary file with
+  // the target rom since the rom directory shown in the MiSTer menu could be
+  // on a filesystem without links support (e.g. vfat in /media/usb0). So we
+  // use bind-mounts.
+  //
+  // The system is cleaned up in rom_unlink.
   //
 
   char filename[strlen(path)];
@@ -769,6 +771,18 @@ static int is_empty_file(const char* path){
 }
 
 static int rom_unlink(system_t* sys) {
+
+  //
+  // This must clear up the work done in rom_link. First we unbind the rom
+  // file; if it succeeded, we remove the file that was an empty one made just
+  // to have a mount point. The containing folder then is removed.  If
+  // something goes wrong, the auxiliary folder and file may remain in the
+  // filesystem. To mitigate this issue we retry critical operations multiple
+  // times. Moreover we unmount and remove any file in the auxiliary folder so
+  // a successive mbc invocation have chance to clean up entities created in
+  // previous failiing invocations.
+  //
+
   int result;
   char aux_path[PATH_MAX] = {0};
 
