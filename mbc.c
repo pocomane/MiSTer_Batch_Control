@@ -19,7 +19,6 @@
 #define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
-#define MBC_TMP_DIR "/run/mbc"
 #define MBC_LINK_NAM "~~~"
 #define CORE_EXT "rbf"
 #define MBCSEQ "HDOFO"
@@ -681,20 +680,10 @@ static void get_link_path(system_t* sys, char* out, int size) {
   }
 }
 
-static int get_aux_rom_path(system_t* sys, char* out, int len){
-  return (0>= snprintf(out, len, "/%s/%s.%s/%s.%s", MBC_TMP_DIR, sys->id, sys->romext, MBC_LINK_NAM, sys->romext));
-}
-
-static int create_aux_rom_file(system_t* sys, char* path){
-  // Note: each directory will contain exactly one file
-  // The extension is added to the folder too, for systems that may have
-  // multiple rom extensione, e.g. the CUSTOM system.
-  char aux_dir_path[PATH_MAX] = {0};
-  int result = get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
+static int create_file(char* path){
+  int result = mkparent(path, 0777);
   if (result) return result;
-  result = mkparent(aux_dir_path, 0777);
-  if (result) return result;
-  FILE* f = fopen(aux_dir_path, "ab");
+  FILE* f = fopen(path, "ab");
   if (!f) return errno;
   return fclose(f);
 }
@@ -748,41 +737,29 @@ static int rom_link(system_t* sys, char* path) {
   // Here we use the system 2)
   //
 
-  char aux_dir_path[PATH_MAX] = {0};
-  get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
+  char linkpath[PATH_MAX] = {0};
+  get_link_path(sys, linkpath, sizeof(linkpath));
 
-  if (create_aux_rom_file(sys, aux_dir_path)) {
-    PRINTERR("Can not create file %s\n", aux_dir_path);
+  if (create_file(linkpath)) {
+    PRINTERR("Can not create rom link file or folder %s\n", linkpath);
     return -1;
   }
 
-  if (filesystem_bind(path, aux_dir_path)) {
-    PRINTERR("Can not bind %s to %s\n", path, aux_dir_path);
+  if (filesystem_bind(path, linkpath)) {
+    PRINTERR("Can not bind %s to %s\n", path, linkpath);
     return -1;
-  }
-
-  char romdir[PATH_MAX] = {0};
-  get_link_path(sys, romdir, sizeof(romdir));
-
-  if (mkparent(romdir, 0777)){
-    PRINTERR("Rom path must be a directory: %s\n", romdir);
-    return -1;
-  }
-
-  path_parentize(romdir);
-  path_parentize(aux_dir_path);
-  if (filesystem_bind(aux_dir_path, romdir)){
-    PRINTERR("Can not bind %s to %s\n", aux_dir_path, romdir);
-    return -1;
-  }
-
-  get_aux_rom_path(sys, aux_dir_path, sizeof(aux_dir_path));
-  if (filesystem_unbind(aux_dir_path)){
-    PRINTERR("Can not unbind %s\n", aux_dir_path);
-    // On error it is better to continue in order to clear the other mount point at least
   }
 
   return 0;
+}
+
+static int is_empty_file(const char* path){
+  struct stat st;
+  int stat_error = stat(path, &st);
+  if (stat_error) return 0;
+  if (!S_ISREG(st.st_mode)) return 0;
+  if (0 != st.st_size) return 0;
+  return 1;
 }
 
 static int rom_unlink(system_t* sys) {
@@ -790,20 +767,9 @@ static int rom_unlink(system_t* sys) {
   char aux_path[PATH_MAX] = {0};
 
   get_link_path(sys, aux_path, sizeof(aux_path));
-  result = filesystem_unbind(aux_path);
-  if (result) {
-    PRINTERR("Can not unbind %s\n", aux_path);
-    return result;
-  }
+  if (!filesystem_unbind(aux_path) && is_empty_file(aux_path))
+    remove(aux_path);
 
-  path_parentize(aux_path);
-  result = filesystem_unbind(aux_path);
-  if (result) {
-    PRINTERR("Can not unbind %s\n", aux_path);
-    return result;
-  }
-
-  rmdir(aux_path); // No issue if error
   path_parentize(aux_path);
   rmdir(aux_path); // No issue if error
 
