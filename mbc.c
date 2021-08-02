@@ -47,6 +47,8 @@
 #define closedir(f)    (LOG("closedir '%s'\n",fake_fd_name(f)), 0)
 #define inotify_rm_watch(f,w)   (LOG("inotifyrm '%s'\n",fake_fd_name(f)), 0)
 #define fopen(p,o)     (LOG("fopen '%s'\n",p), fake_file(p))
+#define fread(d,s,n,o) (LOG("fread '%s'\n",fake_file_name(o)), 0)
+#define fwrite(d,s,n,o) (LOG("fwrite '%s'\n",fake_file_name(o)), 0)
 #define fprintf(f,m,d) (LOG("fprintf '%s' <- '%s'\n",fake_file_name(f),m), 0)
 #define fclose(f)      (LOG("fclose '%s'\n",fake_file_name(f)), 0)
 #define mount(s,t,x,o, y)    (LOG("mount '%s' -> '%s'\n",s,t), 0)
@@ -118,10 +120,11 @@ static int ev_close(int fd) {
   return close(fd);
 }
 
-static void path_parentize(char* path){
+static void path_parentize(char* path, int keep_trailing_separator){
   for (int i = strlen(path); i > 0; i--)
     if (path[i] == '/') {
-      path[i] = '\0';
+      if (!keep_trailing_separator) path[i] = '\0';
+      else path[i+1] = '\0';
       break;
     }
 }
@@ -330,7 +333,7 @@ static system_t system_list[] = {
   { "MACPLUS.2",      "EEMO" MBCSEQ,        "/media/fat/_Computer/MacPlus_",           "MACPLUS",      "dsk", },
   { "MACPLUS.VHD",    "EEMDO" MBCSEQ,       "/media/fat/_Computer/MacPlus_",           "MACPLUS",      "dsk", },
   { "MEGACD",         "EEMO" MBCSEQ,        "/media/fat/_Console/MegaCD_",             "MegaCD",       "chd", },
-  //{ "MEGACD.CUE",     "EEMO" MBCSEQ,        "/media/fat/_Console/MegaCD_",             "MegaCD",       "cue", },
+  { "MEGACD.CUE",     "EEMO" MBCSEQ,        "/media/fat/_Console/MegaCD_",             "MegaCD",       "cue", },
   { "MEGADRIVE",      "EEMO" MBCSEQ,        "/media/fat/_Console/Genesis_",            "Genesis",      "md",  },
   { "MEGADRIVE.BIN",  "EEMO" MBCSEQ,        "/media/fat/_Console/Genesis_",            "Genesis",      "bin",  },
   { "MSX",            "EEMO" MBCSEQ,        "/media/fat/_Computer/MSX_",               "MSX",          "vhd", },
@@ -357,7 +360,7 @@ static system_t system_list[] = {
   { "SUPERGRAFX",     "EEMDO" MBCSEQ,       "/media/fat/_Console/TurboGrafx16_",       "TGFX16",       "sgx", },
   { "TGFX16",         "EEMO" MBCSEQ,        "/media/fat/_Console/TurboGrafx16_",       "TGFX16",       "pce", },
   { "TGFX16-CD",      "EEMDDO" MBCSEQ,      "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "chd", },
-  //{ "TGFX16-CD.CUE",  "EEMDDO" MBCSEQ,      "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "cue", },
+  { "TGFX16-CD.CUE",  "EEMDDO" MBCSEQ,      "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "cue", },
   { "TI-99_4A",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", },
   { "TI-99_4A.D",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", },
   { "TI-99_4A.G",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", },
@@ -670,13 +673,18 @@ static void get_base_path(system_t* sys, char* out, int size) {
   }
 }
 
+static char* get_rom_extension( system_t* sys){
+  if( !sys) return "";
+  return sys->romext;
+}
+
 static void get_link_path(system_t* sys, const char* filename, char* out, int size) {
   if (NULL != sys->sublink) {
     snprintf(out, size-1, "%s", sys->sublink);
   } else {
     get_base_path(sys, out, size);
     int dl = strlen(out);
-    snprintf(out+dl, size-dl-1, "/%s/%s.%s", ROMSUBLINK, filename?filename:MBC_LINK_NAM, sys->romext);
+    snprintf(out+dl, size-dl-1, "/%s/%s.%s", ROMSUBLINK, filename?filename:MBC_LINK_NAM, get_rom_extension( sys));
   }
 }
 
@@ -716,7 +724,16 @@ static int filesystem_unbind(const char* path) {
   return err;
 }
 
-static int rom_link(system_t* sys, char* path) {
+static int is_empty_file(const char* path){
+  struct stat st;
+  int stat_error = stat(path, &st);
+  if (stat_error) return 0;
+  if (!S_ISREG(st.st_mode)) return 0;
+  if (0 != st.st_size) return 0;
+  return 1;
+}
+
+static int rom_link_default(system_t* sys, char* path) {
 
   //
   // We will make some folder and file that will appear in the MiSTer file
@@ -736,7 +753,7 @@ static int rom_link(system_t* sys, char* path) {
   // on a filesystem without links support (e.g. vfat in /media/usb0). So we
   // use bind-mounts.
   //
-  // The system is cleaned up in rom_unlink.
+  // The system is cleaned up in rom_unlink_default.
   //
 
   char filename[strlen(path)];
@@ -761,19 +778,10 @@ static int rom_link(system_t* sys, char* path) {
   return 0;
 }
 
-static int is_empty_file(const char* path){
-  struct stat st;
-  int stat_error = stat(path, &st);
-  if (stat_error) return 0;
-  if (!S_ISREG(st.st_mode)) return 0;
-  if (0 != st.st_size) return 0;
-  return 1;
-}
-
-static int rom_unlink(system_t* sys) {
+static int rom_unlink_default(system_t* sys) {
 
   //
-  // This must clear up the work done in rom_link. First we unbind the rom
+  // This must clear up the work done in rom_link_default. First we unbind the rom
   // file; if it succeeded, we remove the file that was an empty one made just
   // to have a mount point. The containing folder then is removed.  If
   // something goes wrong, the auxiliary folder and file may remain in the
@@ -783,11 +791,10 @@ static int rom_unlink(system_t* sys) {
   // previous failiing invocations.
   //
 
-  int result;
   char aux_path[PATH_MAX] = {0};
 
   get_link_path(sys, NULL, aux_path, sizeof(aux_path));
-  path_parentize(aux_path);
+  path_parentize(aux_path, 0);
 
   struct dirent* ep = NULL;
   DIR* dp = opendir(aux_path);
@@ -804,7 +811,255 @@ static int rom_unlink(system_t* sys) {
 
   rmdir(aux_path); // No issue if error
 
-  return result;
+  return 0;
+}
+
+char* search_in_string(const char* pattern_start, const char* data, size_t *size){
+  char *pattern, *candidate;
+
+#define MATCH_RESET() do{ \
+  pattern = (char*) pattern_start; \
+  candidate = NULL; \
+}while(0)
+
+  MATCH_RESET();
+  while( 1){
+
+    if('\0' == *pattern) goto matched;
+    if('\0' == *data) goto not_matched;
+    if(pattern_start == pattern) candidate = (char*) data;
+
+//    if('%' != *pattern){ // simple char vs wildcard delimiter
+      if(*pattern == *data) pattern += 1; // simple char match
+      else MATCH_RESET();  // simple char do not match
+//    }else{
+//
+//      pattern += 1;
+//      switch(*pattern){
+//        break; default: // wrong wildcard
+//          goto not_matched;
+//
+//        break; case '%': // match a '%' (escaped wildcard delimiter)
+//          if('%' == *data) pattern += 1;
+//          else MATCH_RESET();
+//
+//        break; case 'W': // match zero or more whitespace
+//          while(' ' == *data || '\t' == *data || '\r' == *data || '\n' == *data)
+//            data += 1;
+//          data -= 1;
+//          pattern += 1;
+//      }
+//    }
+    data += 1;
+  }
+not_matched:
+  candidate = NULL;
+
+matched:
+  if(size){
+    if(!candidate) *size = 0;
+    else *size = data - candidate + 1;
+  }
+  return candidate;
+
+#undef MATCH_RESET
+}
+
+
+int get_absolute_dir_name(const char* source, char* out, size_t len){
+  char dirpath[PATH_MAX];
+  realpath(source, dirpath);
+  if( -1 == snprintf(out, len, "%s", dirpath))
+    return -1;
+  return 0;
+}
+
+int get_relative_path_to_root(int skip, const char* path, char* out, size_t len){
+  char dirpath[PATH_MAX];
+  dirpath[0] = '\0';
+  get_absolute_dir_name(path, dirpath, sizeof(dirpath));
+  char* cur = out;
+  snprintf(cur, len, "./");
+  len -= 2;
+  cur += 2;
+  for(int i = 0, count = 0; dirpath[i] != '\0'; i += 1){
+    if(dirpath[i] == '/'){
+      count += 1;
+      if(count > skip){
+        snprintf(cur, len, "../");
+        len -= 3;
+        cur += 3;
+      }
+    }
+  }
+  return 0;
+}
+
+int cue_rebase(char* source, char* destination){
+
+  //
+  // To rebase a .cue we need to substitue all the line like the following:
+  //   FILE "filename.bin" BINARY
+  //
+  // We suppose that between quote there is just a filename that normally is
+  // located in the same directory of the .cue. The MiSTer handles this by
+  // adding in front of the filename the path to the .cue containing folder:
+  //   /path/to/original_cue_folder/filename.bin
+  //
+  // If we copy the file without modification in a new folder, the MiSTer
+  // wil try to access
+  //   /path/to/new_cue_folder/filename.bin
+  //
+  // To fake such system, we replace the original line with
+  //   FILE "../../../path/to/original_cue_folder/filename.bin" BINARY
+  //
+  // so that the MiSTer will search for
+  //   /path/to/new_cue_folder/../../../path/to/original_cue_folder/filename.bin
+  //
+  // There must be enought "../" to reach the root folder starting from the
+  // new_cue_folder one. In this way
+  //   /path/to/original_cue_folder
+  //
+  // is simply the absolute path to the auxiliary directory where the new .cue
+  // file is placed
+  //
+
+  FILE* in = fopen(source, "r");
+  if(!in){
+    PRINTERR("Can not open %s\n", source);
+    return -1;
+  }
+
+  char inc[4096]; inc[0] = '\0';
+  size_t len = fread(inc, 1, sizeof( inc), in);
+  fclose(in);
+
+  FILE* out = fopen(destination, "w");
+  if(!out){
+    PRINTERR( "Can not open %s\n", destination);
+    return -2;
+  }
+
+  char dirpath[PATH_MAX];
+  strncpy(dirpath, destination, sizeof( dirpath));
+  get_relative_path_to_root(1, dirpath, dirpath, sizeof( dirpath));
+  int cat = strlen(dirpath)-1;
+  get_absolute_dir_name(source, dirpath+cat, sizeof( dirpath)-cat-1);
+  path_parentize(dirpath, 1);
+
+  char* curr = inc;
+  while(0 < len){
+    size_t size = 0;
+    char* next = search_in_string("FILE \"", curr, &size);
+    if(NULL == next){
+      fwrite(curr, 1, len, out);
+      break;
+    }else{
+      fwrite(curr, 1, next - curr, out);
+      fwrite("FILE \"", 1, sizeof("FILE \"")-1, out);
+      fwrite(dirpath, 1, strlen(dirpath), out);
+      len -= next - curr + size;
+      curr = next + size - 1;
+    }
+  }
+
+  fclose(out);
+  return 0;
+}
+
+static int rom_link_cue(system_t* sys, char* path) {
+
+  //
+  // Look at rom_link_default for the common case overview.
+  // The .cue is handled in a different way since the MiSTer may need to locate
+  // more than one file. So we simply generate a new .cue in the auxiliary
+  // directory that is a copy of the source one, except for the paths that
+  // are rebased in the new destination folder (look at rebase_cue for more
+  // detaiks).
+  //
+  // The system is cleaned up by the rom_unlink_cue function.
+  // 
+
+  char filename[strlen( path)];
+  filename[0] = '\0';
+  strcpy(filename, after_string(path, '/'));
+  char* ext = after_string(filename,'.');
+  if (ext > filename+1) *(ext-1) = '\0';
+
+  char linkpath[PATH_MAX] = {0};
+  get_link_path(sys, filename, linkpath, sizeof(linkpath));
+
+  if (create_file(linkpath)) {
+    PRINTERR("Can not create rom link file or folder %s\n", linkpath);
+    return -1;
+  }
+
+  if (cue_rebase(path, linkpath)) {
+    return -1;
+  }
+
+  return 0;
+}
+
+int stricmp(const char* a, const char* b) {
+  for (; tolower(*a) == tolower(*b); a += 1, b += 1)
+    if (*a == '\0')
+      return 0;
+  return tolower(*a) - tolower(*b);
+}
+
+static int rom_unlink_cue( system_t* sys) {
+
+  //
+  // This will clear the work done in the rom_link_cue function.
+  // We simply delete all the .cue in the auxiliary directory, and the directory
+  // itself. Look at rom_unlink_default for details on what can happen if
+  // something goes wrong.
+  //
+
+  char aux_path[ PATH_MAX] = {0};
+
+  get_link_path( sys, NULL, aux_path, sizeof(aux_path));
+  path_parentize( aux_path, 0);
+
+  struct dirent* ep = NULL;
+  DIR* dp = opendir( aux_path);
+  if (dp != NULL) {
+    while (0 != ( ep = readdir( dp))){
+      if (!strcmp( ".", ep->d_name) || !strcmp( "..", ep->d_name))
+        continue;
+      char p[ PATH_MAX] = {0};
+      snprintf( p, sizeof(p), "%s/%s", aux_path, ep->d_name);
+      if (!stricmp(get_rom_extension(sys), after_string(ep->d_name, '.')))
+        remove( p);
+    }
+  }
+
+  rmdir( aux_path); // No issue if error
+
+  return 0;
+}
+
+static int rom_link( system_t* sys, char* path) {
+  // The defauld link mechanism is in rom_link_default. Some files need a custom
+  // one, so this is a dispatcher.
+
+  if( !strcmp( get_rom_extension(sys), "cue")){
+    return rom_link_cue( sys, path);
+  }else{
+    return rom_link_default( sys, path);
+  }
+}
+
+static int rom_unlink( system_t* sys) {
+  // The defauld link mechanism is in rom_unlink_default. Some files need a custom
+  // one, so this is a dispatcher.
+
+  if( !strcmp( get_rom_extension(sys), "cue")){
+    return rom_unlink_cue( sys);
+  }else{
+    return rom_unlink_default( sys);
+  }
 }
 
 static int emulate_system_sequence(system_t* sys) {
@@ -947,7 +1202,7 @@ int list_content_for(system_t* sys){
   if (dp != NULL) {
     while (0 != (ep = readdir (dp))){
 
-      if (has_ext(ep->d_name, sys->romext)){
+      if (has_ext(ep->d_name, get_rom_extension( sys))){
         something_found = 1;
         printf("%s %s/%s\n", sys->id, romdir, ep->d_name);
       }
@@ -955,7 +1210,7 @@ int list_content_for(system_t* sys){
     closedir(dp);
   }
   if (!something_found) {
-    //printf("#%s no '.%s' files found in %s\n", sys->id, sys->romext, romdir);
+    //printf("#%s no '.%s' files found in %s\n", sys->id, get_rom_extension( sys), romdir);
   }
   return something_found;
 }
