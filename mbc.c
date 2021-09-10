@@ -53,6 +53,7 @@
 #define fclose(f)      (LOG("fclose '%s'\n",fake_file_name(f)), 0)
 #define mount(s,t,x,o, y)    (LOG("mount '%s' -> '%s'\n",s,t), 0)
 #define umount(p)      (LOG("umount '%s'\n",p), 0)
+#define umount2(p,...) (LOG("umount2 '%s'\n",p), 0)
 #define remove(p)      (LOG("remove '%s'\n",p), 0)
 #define rmdir(p)       (LOG("rmdir '%s'\n",p), 0)
 //#define stat(p,s)      (LOG("stat '%s'\n",p), stat(p,s))
@@ -712,14 +713,18 @@ static int filesystem_bind(const char* source, const char* target) {
 
 static int filesystem_unbind(const char* path) {
   int err = 0;
-  for(int r = 0; r < 20; r += 1){
-    if (r > 14) LOG("retrying the unbinding since the mount point is busy (%s)\n", path);
-    if (r != 0) msleep(1000);
+  for(int r = 0; r < 10; r += 1){
+    if (r > 7) LOG("retrying the unbinding since the mount point is busy (%s)\n", path);
+    if (r != 0) msleep(500);
 
     err = umount(path);
 
     if (err) err = errno;
     if (EBUSY != err) break;
+  }
+  if (EBUSY == err){
+    LOG("%s\n", "trying to unmounting with the DETACH option since nothing else worked");
+    err = umount2(path, MNT_DETACH);
   }
   return err;
 }
