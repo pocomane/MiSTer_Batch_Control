@@ -16,6 +16,8 @@
 #include <sys/inotify.h>
 #include <poll.h>
 
+#define MBC_BUILD_REVISION 33
+
 #define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
@@ -1432,6 +1434,13 @@ static void read_options(int argc, char* argv[]) {
 }
 
 static void print_help(char* name) {
+  printf("MBC (Mister Batch Control) Revision %d\n", MBC_BUILD_REVISION);
+#ifdef MBC_BUILD_DATE
+  printf("Build timestamp: %s\n", MBC_BUILD_DATE);
+#endif // MBC_BUILD_DATE
+#ifdef MBC_BUILD_COMMIT
+  printf("Build commit: %s\n", MBC_BUILD_COMMIT);
+#endif // MBC_BUILD_COMMIT
   printf("Usage:\n");
   printf("  %s COMMAND [ARGS]\n", name);
   printf("\n");

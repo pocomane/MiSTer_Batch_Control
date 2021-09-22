@@ -19,9 +19,15 @@ if [ "$(ls build/arm-linux-musle*)" = "" ] ; then
   cd ..
 fi
 
+BFLAG=" -std=c99 -Wall -D_XOPEN_SOURCE=700 -static -O2 "
+COMMIT=$(git rev-parse HEAD)
+BFLAG=" $BFLAG -DMBC_BUILD_COMMIT=\"$COMMIT\" "
+DATE=$(date --rfc-3339=seconds | tr ' ' '/')
+BFLAG=" $BFLAG -DMBC_BUILD_DATE=\"$DATE\" "
+
 echo "building..."
 cd build
-arm-linux-musleabihf-gcc -std=c99 -Wall -D_XOPEN_SOURCE=700 -static -O2 -o mbc ../mbc.c ||die
+arm-linux-musleabihf-gcc $BFLAG -o mbc ../mbc.c ||die
 arm-linux-musleabihf-strip mbc ||die
 mkdir -p hook/expose ||die
 cd hook/expose ||die
