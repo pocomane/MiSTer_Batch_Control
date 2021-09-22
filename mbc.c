@@ -340,7 +340,7 @@ static system_t system_list[] = {
   { "MSX",            "EEMO" MBCSEQ,        "/media/fat/_Computer/MSX_",               "MSX",          "vhd", },
   { "NEOGEO",         "EEMO" MBCSEQ,        "/media/fat/_Console/NeoGeo_",             "NeoGeo",       "neo", },
   { "NES",            "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "NES",          "nes", },
-  { "NES.FDS",        "EEMDO" MBCSEQ,       "/media/fat/_Console/NES_",                "NES",          "nes", },
+  { "NES.FDS",        "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "NES",          "fds", },
   { "ODYSSEY2",       "EEMO" MBCSEQ,        "/media/fat/_Console/Odyssey2_",           "ODYSSEY2",     "bin", },
   { "ORAO",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ORAO_",              "ORAO",         "tap", },
   { "ORIC",           "EEMO" MBCSEQ,        "/media/fat/_Computer/Oric_",              "Oric_",        "dsk", },
