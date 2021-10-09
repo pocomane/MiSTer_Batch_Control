@@ -357,6 +357,7 @@ static system_t system_list[] = {
   { "SAMCOUPE.2",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", },
   { "SCRIPT",         "EDDDODOHDO",         "/media/fat/menu",                         "/media/fat/_Scripts", "sh", "/media/fat/Scripts/~~~.sh" },
   { "SMS",            "EEMO" MBCSEQ,        "/media/fat/_Console/SMS_",                "SMS",          "sms", },
+  { "SMS.GG",         "EEMDO" MBCSEQ,       "/media/fat/_Console/SMS_",                "SMS",          "gg", },
   { "SNES",           "EEMO" MBCSEQ,        "/media/fat/_Console/SNES_",               "SNES",         "sfc", },
   { "SPECIALIST",     "EEMO" MBCSEQ,        "/media/fat/_Computer/Specialist_",        "Specialist_",  "rsk", },
   { "SPECIALIST.ODI", "EEMDO" MBCSEQ,       "/media/fat/_Computer/Specialist_",        "Specialist_",  "odi", },
