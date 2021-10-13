@@ -388,6 +388,7 @@ static system_t system_list[] = {
   { "WONDERSWAN.COL", "EEMO" MBCSEQ,        "/media/fat/_Console/WonderSwan_",         "WonderSwan",   "wsc", },
   { "ZX81",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "ZX81",         "0",   },
   { "ZX81.P",         "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "ZX81",         "p",   },
+  { "ZXNEXT",         "EEMODODOMUUOEEEEEEE" MBCSEQ, "/media/fat/_Computer/ZXNext_",    "ZXNext",       "vhd", },
 
   // unsupported
   //{ "AMIGA",          "EEMO" MBCSEQ,        "/media/fat/_Computer/Minimig_",           "/media/fat/games/Amiga",     0, },
