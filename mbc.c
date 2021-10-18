@@ -267,6 +267,22 @@ void user_input_close(input_monitor*monitor){
   monitor->file_n = 0;
 }
 
+static size_t updatehash( size_t hash, char c){
+  return hash ^( c + (hash<<5) + (hash>>2));
+}
+
+size_t contenthash( const char* path){
+  FILE *mnt  = fopen( path, "r");
+  if( !mnt) return 0;
+  int c;
+  size_t hash = 0;
+  while( EOF != ( c = fgetc( mnt)))
+    hash = updatehash( hash, (char) c);
+  fclose(mnt);
+  if( 0 == hash) hash = 1; // 0 is considered invalid hash, so it can be used as error or initialization value
+  return hash;
+}
+
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
   char *menuseq; // Sequence of input for the rom selection; searched in the internal DB
@@ -388,7 +404,7 @@ static system_t system_list[] = {
   { "WONDERSWAN.COL", "EEMO" MBCSEQ,        "/media/fat/_Console/WonderSwan_",         "WonderSwan",   "wsc", },
   { "ZX81",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "ZX81",         "0",   },
   { "ZX81.P",         "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "ZX81",         "p",   },
-  { "ZXNEXT",         "EEMODODOMUUOEEEEEEE" MBCSEQ, "/media/fat/_Computer/ZXNext_",    "ZXNext",       "vhd", },
+  { "ZXNEXT",         "EEMODODOMUU!mO!m" MBCSEQ, "/media/fat/_Computer/ZXNext_",       "ZXNext",       "vhd", },
 
   // unsupported
   //{ "AMIGA",          "EEMO" MBCSEQ,        "/media/fat/_Computer/Minimig_",           "/media/fat/games/Amiga",     0, },
@@ -422,22 +438,54 @@ static void emulate_key(int fd, int key) {
   emulate_key_release(fd, key);
 }
 
+static void key_emulator_wait_mount(){
+  static size_t mnthash = 0;
+  LOG("%s\n", "waiting for some change in the mount table");
+  size_t newhash = mnthash;
+  for(int retry = 0; retry < 20; retry += 1){
+    newhash = contenthash("/proc/mounts");
+    if (newhash != mnthash) break;
+    msleep(500);
+  }
+  if (newhash != mnthash) LOG("%s (%ld)\n", "detected a change in the mounting points", newhash);
+  else LOG("%s (%ld)\n", "no changes in the mounting points (timeout)", newhash);
+  mnthash = newhash;
+}
+
+static void key_emulator_function(int fd, int code){
+  switch (code){
+    default: return;
+    break; case KEY_M: key_emulator_wait_mount();
+    break; case KEY_S: msleep(1000);
+  }
+}
+
+#define TAG_KEY_NOTHING '\0'
 #define TAG_KEY_PRESS   '{'
 #define TAG_KEY_RELEASE '}'
 #define TAG_KEY_FULL    ':'
+#define TAG_KEY_FUNCT   '!'
 
 static char* parse_hex_byte(char* seq, int* code, int* tag){
   int c, n;
   if (0> sscanf(seq, "%2x%n", &c, &n) || 2!= n) return 0;
   if (code) *code = c;
-  if (tag) *tag = TAG_KEY_FULL;
+  if (tag) *tag = TAG_KEY_NOTHING;
   return seq+n;
 }
 
 static char* parse_tagged_byte(char* seq, int* code, int* tag){
-  if (tag) *tag = *seq; // any single char tag is valid (action support is checked by the caller)
   if (seq[1] == '\0') return 0;
-  return parse_hex_byte(seq+1, code, 0);
+  char* result = parse_hex_byte(seq+1, code, 0);
+  if( !result) return 0;
+  switch( *seq){
+    default: return 0;
+    // TODO : use different char and tag definition
+    case TAG_KEY_FULL: if (tag) *tag = TAG_KEY_FULL;
+    case TAG_KEY_PRESS: if (tag) *tag = TAG_KEY_PRESS;
+    case TAG_KEY_RELEASE: if (tag) *tag = TAG_KEY_RELEASE;
+  }
+  return result;
 }
 
 static char* parse_alphanumeric_key(char* seq, int* code, int* tag){
@@ -486,6 +534,14 @@ static char* parse_alphanumeric_key(char* seq, int* code, int* tag){
   return seq+1;
 }
 
+static char* parse_tagged_alphanumeric_key(char* seq, int* code, int* tag){
+  char* result = parse_alphanumeric_key(seq+1, code, tag);
+  if (!result) return 0;
+  if (TAG_KEY_FUNCT != *seq) return 0; // TODO : use different char and tag definition
+  if (tag) *tag = TAG_KEY_FUNCT;
+  return result;
+}
+
 static char* parse_special_key(char* seq, int* code, int* tag){
   int i = 0; if (!code) code = &i;
   switch (*seq) {
@@ -508,6 +564,7 @@ static char* parse_special_key(char* seq, int* code, int* tag){
 static char* parse_key_sequence(char* seq, int* code, int* tag){
   char *next;
   if (0!=( next = parse_alphanumeric_key(seq, code, tag) )) return next;
+  if (0!=( next = parse_tagged_alphanumeric_key(seq, code, tag) )) return next;
   if (0!=( next = parse_special_key(seq, code, tag) )) return next;
   if (0!=( next = parse_tagged_byte(seq, code, tag) )) return next;
   return 0;
@@ -538,6 +595,7 @@ static int emulate_sequence(char* seq) {
       break;case TAG_KEY_FULL: emulate_key(fd, code);
       break;case TAG_KEY_PRESS: emulate_key_press(fd, code);
       break;case TAG_KEY_RELEASE: emulate_key_release(fd, code);
+      break;case TAG_KEY_FUNCT: key_emulator_function(fd, code);
     }
   }
 
