@@ -84,6 +84,10 @@ meanings:
 - :XX - press and release of the key with the hex code XX
 - {XX - press of the key with the hex code XX
 - }XX - release of the key with the hex code XX
+- !s - wait for 1 second
+- !m - wait that some mount point changes (the first time it is called, it does
+  not wait since the initial detected mount table is empty; so it must be called
+  multiple time in the sequence, e.g. `EEMDD!mO!m`)
 
 The `XX` value is the hex representition of the coded in the
 [uapi/input-event-code](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)
@@ -153,7 +157,6 @@ following environment variables:
    just to open the menu, e.g.
    `MBC_CUSTOM_LINK="/media/fat/games/NES/ !MBC/~~~/nes"` and
    `MBC_CUSTOM_SEQUENCE=EEMO`
-
 
 ## Command list_content
 
