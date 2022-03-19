@@ -481,9 +481,9 @@ static char* parse_tagged_byte(char* seq, int* code, int* tag){
   switch( *seq){
     default: return 0;
     // TODO : use different char and tag definition
-    case TAG_KEY_FULL: if (tag) *tag = TAG_KEY_FULL;
-    case TAG_KEY_PRESS: if (tag) *tag = TAG_KEY_PRESS;
-    case TAG_KEY_RELEASE: if (tag) *tag = TAG_KEY_RELEASE;
+    break; case TAG_KEY_FULL: if (tag) *tag = TAG_KEY_FULL;
+    break; case TAG_KEY_PRESS: if (tag) *tag = TAG_KEY_PRESS;
+    break; case TAG_KEY_RELEASE: if (tag) *tag = TAG_KEY_RELEASE;
   }
   return result;
 }
