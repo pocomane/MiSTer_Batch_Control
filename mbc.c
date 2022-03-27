@@ -298,6 +298,8 @@ static system_t system_list[] = {
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
   { "ALICEMC10",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/AliceMC10_",         "AliceMC10",    "c10", },
+  { "AMIGA.ADF",      "EEMO" MBCSEQ "E",    "/media/fat/_Computer/Minimig_",           "Amiga",        "adf", },
+  { "AMIGA.HDF",      "EEMDDDODDDO" MBCSEQ ":0EDDDDDO","/media/fat/_Computer/Minimig_","Amiga",        "hdf", },
   { "AMSTRAD",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Amstrad_",           "Amstrad",      "dsk", },
   { "AMSTRAD-PCW",    "EEMO" MBCSEQ,        "/media/fat/_Computer/Amstrad-PCW_",       "Amstrad PCW",  "dsk", },
   { "AMSTRAD-PCW.B",  "EEMDO" MBCSEQ,       "/media/fat/_Computer/Amstrad-PCW_",       "Amstrad PCW",  "dsk", },
