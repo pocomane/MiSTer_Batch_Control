@@ -3,7 +3,11 @@
 
 This is a simple command line utility to control the [MiSTer
 fpga](https://github.com/MiSTer-devel). Its main purpose is to load ROM files
-since this features is not supported by the MiSTer out of the box.
+from the command line since this features is not supported by the MiSTer out of
+the box.
+
+This software is in the public domain.  IT IS PROVIDED "AS IS", WITHOUT
+WARRANTY OF ANY KIND.
 
 # Installation
 
@@ -27,7 +31,7 @@ should be able to compile the utility, since it does not have any dependency
 
 Some functionalities need specific support for each system.  To handle
 not-supported or non-standard cases, the `CUSTOM` system is provided. It let
-you, for example, to freely set the game directory, the symulated key sequence,
+you, for example, to freely set the game directory, the startup delay,
 etc.  It is configured with the environment variables specified in the
 `list_core` command section.  If you make a system work in this way, please
 open a github issue specifying the value of the variables, so its support can
@@ -139,24 +143,22 @@ The `list_core` command lists the systems. The list will contain the `SYSTEM` id
 the path of the default core. The special system `CUSTOM` can be by mean of the
 following environment variables:
 
-- `MBC_CUSTOM_SEQUENCE` is the sequence of keys needed to open the rom
-  selection menu; it must be specified in the same format of the `raw_seq`
-  command.  e.g. `MBC_CUSTOM_SEQUENCE=EEMO`
-
-- `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file, e.g.
-  `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
+- `MBC_CUSTOM_CORE` is the fixed suffix of the path of the core file; the special
+  value "!direct" can be used to load the rom directly, like in the ARCADE system;
+  e.g. `MBC_CUSTOM_CORE=/media/fat/_Console/NES_`
 
 - `MBC_CUSTOM_FOLDER` is the name of the folders that are related to the system,
-   e.g. `MBC_CUSTOM_FOLDER=NES`
+  e.g. `MBC_CUSTOM_FOLDER=NES`
 
 - `MBC_CUSTOM_ROM_EXT` is the extension of the rom files, e.g.
   `MBC_CUSTOM_ROM_EXT=nes`
 
-- `MBC_CUSTOM_LINK` is the position of the temporary rom link; if it is present
-   the `MBC_CUSTOM_SEQUENCE` must be the sequence to select the exact item, not
-   just to open the menu, e.g.
-   `MBC_CUSTOM_LINK="/media/fat/games/NES/ !MBC/~~~/nes"` and
-   `MBC_CUSTOM_SEQUENCE=EEMO`
+- `MBC_CUSTOM_DELAY` number of seconds to wait before load/mount the rom, more
+  details at [MGL doc](https://mister-devel.github.io/MkDocs_MiSTer/advanced/mgl/#mgl-format);
+  e.g. `MBC_CUSTOM_DELAY=2`
+
+- `MBC_CUSTOM_MODE` type and index for the MGL load, more details at [MGL doc](https://mister-devel.github.io/MkDocs_MiSTer/advanced/mgl/#mgl-format);
+  e.g. `MBC_CUSTOM_MODE=f0`
 
 ## Command list_content
 
@@ -226,6 +228,38 @@ mbc stream
 
 It will open the standard input, and will execute each line as a single command.
 
+## Command mgl_gen
 
-## TODO : document other commands !
+```
+mbc mgl_gen SYSTEM /PATH/TO/CORE /PATH/TO/ROM
+```
+
+This will generate an MGL able to run the CORE and load the ROM. The SYSTEM must
+be provided in order to generate a compatible MGL script. The output script will
+be printed on the standard output.
+
+## Command mgl_gen_auto
+
+```
+mbc mgl_gen_auto /PATH/TO/CORE /PATH/TO/ROM
+```
+
+This is similar to the `mgl_gen` command, but it tries to match the system
+from the core file name.
+
+## Command list_rom_for
+
+TODO : describe
+
+## Command load_core
+
+TODO : describe
+
+## Command load_core_as
+
+TODO : describe
+
+## Command done
+
+TODO : describe
 

@@ -16,15 +16,13 @@
 #include <sys/inotify.h>
 #include <poll.h>
 
-#define MBC_BUILD_REVISION 33
+#define MBC_BUILD_REVISION 34
 
 #define DEVICE_NAME "Fake device"
 #define DEVICE_PATH "/dev/uinput"
 #define MISTER_COMMAND_DEVICE "/dev/MiSTer_cmd"
-#define MBC_LINK_NAM "~~~"
+#define MGL_PATH "/run/mbc.mgl"
 #define CORE_EXT "rbf"
-#define MBCSEQ "HDOFO"
-#define ROMSUBLINK " !MBC"
 
 #define HAS_PREFIX(P, N) (!strncmp(P, N, sizeof(P)-1)) // P must be a string literal
 
@@ -123,15 +121,6 @@ static int ev_close(int fd) {
   return close(fd);
 }
 
-static void path_parentize(char* path, int keep_trailing_separator){
-  for (int i = strlen(path); i > 0; i--)
-    if (path[i] == '/') {
-      if (!keep_trailing_separator) path[i] = '\0';
-      else path[i+1] = '\0';
-      break;
-    }
-}
-
 static int is_dir(const char* path){
   struct stat st;
   int stat_error = stat(path, &st);
@@ -177,13 +166,6 @@ static int mkparent(const char *path, mode_t mode) {
   int status = mkparent_core(pathdup, mode);
   free(pathdup);
   return status;
-}
-
-static int mkdirpath(const char *path, mode_t mode) {
-  if (is_dir(path)) return 0;
-  int result = mkparent(path, mode);
-  if (result) return result;
-  return mkdir_core(path, mode);
 }
 
 typedef struct {
@@ -285,138 +267,140 @@ size_t contenthash( const char* path){
 
 typedef struct {
   char *id;      // This must match the filename before the last _ . Otherwise it can be given explicitly at the command line. It must be UPPERCASE without any space.
-  char *menuseq; // Sequence of input for the rom selection; searched in the internal DB
   char *core;    // Path prefix to the core; searched in the internal DB
   char *fsid;    // Name used in the filesystem to identify the folders of the system; if it starts with something different than '/', it will identify a subfolder of a default path
   char *romext;  // Valid extension for rom filename; searched in the internal DB
-  char *sublink; // If not NULL, the auxiliary rom link will be made in the specified path, instead of default one
+  char *loadmode;// Load mode for the MGL, more detail a thttps://mister-devel.github.io/MkDocs_MiSTer/advanced/mgl/#mgl-format
+  char *delay;   // Delay to be used during the MGL load, more detail at https://mister-devel.github.io/MkDocs_MiSTer/advanced/mgl/#mgl-format
 } system_t;
+
+#define ROM_IS_THE_CORE "!direct"
 
 static system_t system_list[] = {
   // The first field can not contain '\0'.
   // The array must be lexicographically sorted wrt the first field (e.g.
   //   :sort vim command, but mind '!' and escaped chars at end of similar names).
  
-  { "ALICEMC10",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/AliceMC10_",         "AliceMC10",    "c10", },
-  { "AMIGA.ADF",      "EEMO" MBCSEQ "E",    "/media/fat/_Computer/Minimig_",           "Amiga",        "adf", },
-  { "AMIGA.HDF",      "EEMDDDODDDO" MBCSEQ ":0EDDDDDO","/media/fat/_Computer/Minimig_","Amiga",        "hdf", },
-  { "AMSTRAD",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Amstrad_",           "Amstrad",      "dsk", },
-  { "AMSTRAD-PCW",    "EEMO" MBCSEQ,        "/media/fat/_Computer/Amstrad-PCW_",       "Amstrad PCW",  "dsk", },
-  { "AMSTRAD-PCW.B",  "EEMDO" MBCSEQ,       "/media/fat/_Computer/Amstrad-PCW_",       "Amstrad PCW",  "dsk", },
-  { "AMSTRAD.B",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Amstrad_",           "Amstrad",      "dsk", },
-  { "AMSTRAD.TAP",    "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Amstrad_",           "Amstrad",      "cdt", },
-  { "AO486",          "EEMO" MBCSEQ,        "/media/fat/_Computer/ao486_",             "AO486",        "img", },
-  { "AO486.B",        "EEMDO" MBCSEQ,       "/media/fat/_Computer/ao486_",             "AO486",        "img", },
-  { "AO486.C",        "EEMDDO" MBCSEQ,      "/media/fat/_Computer/ao486_",             "AO486",        "vhd", },
-  { "AO486.D",        "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/ao486_",             "AO486",        "vhd", },
-  { "APOGEE",         "EEMO" MBCSEQ,        "/media/fat/_Computer/Apogee_",            "APOGEE",       "rka", },
-  { "APPLE-I",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-I_",           "Apple-I",      "txt", },
-  { "APPLE-II",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Apple-II_",          "Apple-II",     "dsk", },
-  { "AQUARIUS.BIN",   "EEMO" MBCSEQ,        "/media/fat/_Computer/Aquarius_",          "AQUARIUS",     "bin", },
-  { "AQUARIUS.CAQ",   "EEMDO" MBCSEQ,       "/media/fat/_Computer/Aquarius_",          "AQUARIUS",     "caq", },
-  { "ARCADE",         "O" MBCSEQ,           "/media/fat/menu",                         "/media/fat/_Arcade", "mra", "/media/fat/_Arcade/_ !MBC/~~~.mra"},
-  { "ARCHIE.D1",      "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/Archie_",            "ARCHIE",       "vhd", },
-  { "ARCHIE.F0",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Archie_",            "ARCHIE",       "img", },
-  { "ARCHIE.F1",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/Archie_",            "ARCHIE",       "img", },
-  { "ASTROCADE",      "EEMO" MBCSEQ,        "/media/fat/_Console/Astrocade_",          "Astrocade",    "bin", },
-  { "ATARI2600",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari2600_",          "ATARI2600",    "rom", },
-  { "ATARI2600",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari2600_",          "Astrocade",    "rom", },
-  { "ATARI5200",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari5200_",          "ATARI5200",    "rom", },
-  { "ATARI7800",      "EEMO" MBCSEQ,        "/media/fat/_Console/Atari7800_",          "ATARI7800",    "a78", },
-  { "ATARI800.CART",  "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Atari800_",          "ATARI800",     "car", },
-  { "ATARI800.D1",    "EEMO" MBCSEQ,        "/media/fat/_Computer/Atari800_",          "ATARI800",     "atr", },
-  { "ATARI800.D2",    "EEMDO" MBCSEQ,       "/media/fat/_Computer/Atari800_",          "ATARI800",     "atr", },
-  { "ATARILYNX",      "EEMO" MBCSEQ,        "/media/fat/_Console/AtariLynx_",          "AtariLynx",    "lnx", },
-  { "BBCMICRO",       "EEMO" MBCSEQ,        "/media/fat/_Computer/BBCMicro_",          "BBCMicro",     "vhd", },
-  { "BK0011M",        "EEMO" MBCSEQ,        "/media/fat/_Computer/BK0011M_",           "BK0011M",      "bin", },
-  { "BK0011M.A",      "EEMDO" MBCSEQ,       "/media/fat/_Computer/BK0011M_",           "BK0011M",      "dsk", },
-  { "BK0011M.B",      "EEMDDO" MBCSEQ,      "/media/fat/_Computer/BK0011M_",           "BK0011M",      "dsk", },
-  { "BK0011M.HD",     "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/BK0011M_",           "BK0011M",      "vhd", },
-  { "C16.CART",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/C16_",               "C16",          "bin", },
-  { "C16.DISK",       "EEMDDO" MBCSEQ,      "/media/fat/_Computer/C16_",               "C16",          "d64", },
-  { "C16.TAPE",       "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/C16_",               "C16",          "tap", },
-  { "C64.CART",       "EEMDDDDO" MBCSEQ,    "/media/fat/_Computer/C64_",               "C65",          "crt", },
-  { "C64.DISK",       "EEMO" MBCSEQ,        "/media/fat/_Computer/C64_",               "C64",          "rom", },
-  { "C64.PRG",        "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/C64_",               "C64",          "prg", },
-  { "C64.TAPE",       "EEMO" MBCSEQ,        "/media/fat/_Computer/C64_",               "C64",          "rom", },
-  { "COCO_2",         "EEMDDDDDDO" MBCSEQ,  "/media/fat/_Computer/CoCo2_",             "CoCo2",        "rom", },
-  { "COCO_2.CAS",     "EEMDDDDDDDO" MBCSEQ, "/media/fat/_Computer/CoCo2_",             "CoCo2",        "cas", },
-  { "COCO_2.CCC",     "EEMDDDDDDO" MBCSEQ,  "/media/fat/_Computer/CoCo2_",             "CoCo2",        "ccc", },
-  { "COLECO",         "EEMO" MBCSEQ,        "/media/fat/_Console/ColecoVision_",       "Coleco",       "col", },
-  { "COLECO.SG",      "EEMDO" MBCSEQ,       "/media/fat/_Console/ColecoVision_",       "Coleco",       "sg",  },
-  { "CUSTOM",         "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "NES",          "nes", },
-  { "EDSAC",          "EEMO" MBCSEQ,        "/media/fat/_Computer/EDSAC_",             "EDSAC",        "tap", },
-  { "GALAKSIJA",      "EEMO" MBCSEQ,        "/media/fat/_Computer/Galaksija_",         "Galaksija",    "tap", },
-  { "GAMEBOY",        "EEMO" MBCSEQ,        "/media/fat/_Console/Gameboy_",            "GameBoy",      "gb",  },
-  { "GAMEBOY.COL",    "EEMO" MBCSEQ,        "/media/fat/_Console/Gameboy_",            "GameBoy",      "gbc", },
-  { "GBA",            "EEMO" MBCSEQ,        "/media/fat/_Console/GBA_",                "GBA",          "gba", },
-  { "GENESIS",        "EEMO" MBCSEQ,        "/media/fat/_Console/Genesis_",            "Genesis",      "gen",  },
-  { "INTELLIVISION",  "EEMO" MBCSEQ,        "/media/fat/_Console/Intellivision_",      "Intellivision", "bin", },
-  { "JUPITER",        "EEMO" MBCSEQ,        "/media/fat/_Computer/Jupiter_",           "Jupiter_",     "ace", },
-  { "LASER310",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Laser310_",          "Laser310_",    "vz",  },
-  { "MACPLUS.2",      "EEMO" MBCSEQ,        "/media/fat/_Computer/MacPlus_",           "MACPLUS",      "dsk", },
-  { "MACPLUS.VHD",    "EEMDO" MBCSEQ,       "/media/fat/_Computer/MacPlus_",           "MACPLUS",      "dsk", },
-  { "MEGACD",         "EEMO" MBCSEQ,        "/media/fat/_Console/MegaCD_",             "MegaCD",       "chd", },
-  { "MEGACD.CUE",     "EEMO" MBCSEQ,        "/media/fat/_Console/MegaCD_",             "MegaCD",       "cue", },
-  { "MEGADRIVE",      "EEMO" MBCSEQ,        "/media/fat/_Console/Genesis_",            "Genesis",      "md",  },
-  { "MEGADRIVE.BIN",  "EEMO" MBCSEQ,        "/media/fat/_Console/Genesis_",            "Genesis",      "bin",  },
-  { "MSX",            "EEMO" MBCSEQ,        "/media/fat/_Computer/MSX_",               "MSX",          "vhd", },
-  { "NEOGEO",         "EEMO" MBCSEQ,        "/media/fat/_Console/NeoGeo_",             "NeoGeo",       "neo", },
-  { "NES",            "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "NES",          "nes", },
-  { "NES.FDS",        "EEMO" MBCSEQ,        "/media/fat/_Console/NES_",                "NES",          "fds", },
-  { "ODYSSEY2",       "EEMO" MBCSEQ,        "/media/fat/_Console/Odyssey2_",           "ODYSSEY2",     "bin", },
-  { "ORAO",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ORAO_",              "ORAO",         "tap", },
-  { "ORIC",           "EEMO" MBCSEQ,        "/media/fat/_Computer/Oric_",              "Oric_",        "dsk", },
-  { "PDP1",           "EEMO" MBCSEQ,        "/media/fat/_Computer/PDP1_",              "PDP1",         "bin", },
-  { "PET2001",        "EEMO" MBCSEQ,        "/media/fat/_Computer/PET2001_",           "PET2001",      "prg", },
-  { "PET2001.TAP",    "EEMO" MBCSEQ,        "/media/fat/_Computer/PET2001_",           "PET2001",      "tap", },
-  { "QL",             "EEMO" MBCSEQ,        "/media/fat/_Computer/QL_",                "QL_",          "mdv", },
-  { "SAMCOUPE.1",     "EEMO" MBCSEQ,        "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", },
-  { "SAMCOUPE.2",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", },
-  { "SCRIPT",         "EDDDODOHDO",         "/media/fat/menu",                         "/media/fat/_Scripts", "sh", "/media/fat/Scripts/~~~.sh" },
-  { "SMS",            "EEMO" MBCSEQ,        "/media/fat/_Console/SMS_",                "SMS",          "sms", },
-  { "SMS.GG",         "EEMDO" MBCSEQ,       "/media/fat/_Console/SMS_",                "SMS",          "gg", },
-  { "SNES",           "EEMO" MBCSEQ,        "/media/fat/_Console/SNES_",               "SNES",         "sfc", },
-  { "SPECIALIST",     "EEMO" MBCSEQ,        "/media/fat/_Computer/Specialist_",        "Specialist_",  "rsk", },
-  { "SPECIALIST.ODI", "EEMDO" MBCSEQ,       "/media/fat/_Computer/Specialist_",        "Specialist_",  "odi", },
-  { "SPECTRUM",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/ZX-Spectrum_",       "Spectrum",     "tap", },
-  { "SPECTRUM.DSK",   "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX-Spectrum_",       "Spectrum",     "dsk", },
-  { "SPECTRUM.SNAP",  "EEMDDO" MBCSEQ,      "/media/fat/_Computer/ZX-Spectrum_",       "Spectrum",     "z80", },
-  { "SUPERGRAFX",     "EEMDO" MBCSEQ,       "/media/fat/_Console/TurboGrafx16_",       "TGFX16",       "sgx", },
-  { "TGFX16",         "EEMO" MBCSEQ,        "/media/fat/_Console/TurboGrafx16_",       "TGFX16",       "pce", },
-  { "TGFX16-CD",      "EEMDDO" MBCSEQ,      "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "chd", },
-  { "TGFX16-CD.CUE",  "EEMDDO" MBCSEQ,      "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "cue", },
-  { "TI-99_4A",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", },
-  { "TI-99_4A.D",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", },
-  { "TI-99_4A.G",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", },
-  { "TRS-80",         "EEMO" MBCSEQ,        "/media/fat/_Computer/TRS-80_",            "TRS-80_",      "dsk", },
-  { "TRS-80.1",       "EEMDO" MBCSEQ,       "/media/fat/_Computer/TRS-80_",            "TRS-80_",      "dsk", },
-  { "TSCONF",         "EEMO" MBCSEQ,        "/media/fat/_Computer/TSConf_",            "TSConf_",      "vhd", },
-  { "VC4000",         "EEMO" MBCSEQ,        "/media/fat/_Console/VC4000_",             "VC4000",       "bin", },
-  { "VECTOR06",       "EEMO" MBCSEQ,        "/media/fat/_Computer/Vector-06C_""/core", "VECTOR06",     "rom", },
-  { "VECTOR06.A",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/Vector-06C_""/core", "VECTOR06",     "fdd", },
-  { "VECTOR06.B",     "EEMDDO" MBCSEQ,      "/media/fat/_Computer/Vector-06C_""/core", "VECTOR06",     "fdd", },
-  { "VECTREX",        "EEMO" MBCSEQ,        "/media/fat/_Console/Vectrex_",            "VECTREX",      "vec", },
-  { "VECTREX.OVR",    "EEMDO" MBCSEQ,       "/media/fat/_Console/Vectrex_",            "VECTREX",      "ovr", },
-  { "VIC20",          "EEMO" MBCSEQ,        "/media/fat/_Computer/VIC20_",             "VIC20",        "prg", },
-  { "VIC20.CART",     "EEMDO" MBCSEQ,       "/media/fat/_Computer/VIC20_",             "VIC20",        "crt", },
-  { "VIC20.CT",       "EEMDDO" MBCSEQ,      "/media/fat/_Computer/VIC20_",             "VIC20",        "ct",  },
-  { "VIC20.DISK",     "EEMDDDO" MBCSEQ,     "/media/fat/_Computer/VIC20_",             "VIC20",        "d64", },
-  { "WONDERSWAN",     "EEMO" MBCSEQ,        "/media/fat/_Console/WonderSwan_",         "WonderSwan",   "ws",  },
-  { "WONDERSWAN.COL", "EEMO" MBCSEQ,        "/media/fat/_Console/WonderSwan_",         "WonderSwan",   "wsc", },
-  { "ZX81",           "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "ZX81",         "0",   },
-  { "ZX81.P",         "EEMO" MBCSEQ,        "/media/fat/_Computer/ZX81_",              "ZX81",         "p",   },
-  { "ZXNEXT",         "EEMODOD!mOMUUO!m" MBCSEQ, "/media/fat/_Computer/ZXNext_",       "ZXNext",       "vhd", },
+  { "ALICEMC10",      "/media/fat/_Computer/AliceMC10_",         "AliceMC10",    "c10", "f0", "1", },
+  { "AMIGA.ADF",      "/media/fat/_Computer/Minimig_",           "Amiga",        "adf", "f0", "1", },
+  { "AMIGA.HDF",      "Amiga",                                   "Amiga",        "hdf", "f0", "1", },
+  { "AMSTRAD",        "/media/fat/_Computer/Amstrad_",           "Amstrad",      "dsk", "f0", "1", },
+  { "AMSTRAD-PCW",    "/media/fat/_Computer/Amstrad-PCW_",       "Amstrad PCW",  "dsk", "f0", "1", },
+  { "AMSTRAD-PCW.B",  "/media/fat/_Computer/Amstrad-PCW_",       "Amstrad PCW",  "dsk", "f0", "1", },
+  { "AMSTRAD.B",      "/media/fat/_Computer/Amstrad_",           "Amstrad",      "dsk", "f0", "1", },
+  { "AMSTRAD.TAP",    "/media/fat/_Computer/Amstrad_",           "Amstrad",      "cdt", "f0", "1", },
+  { "AO486",          "/media/fat/_Computer/ao486_",             "AO486",        "img", "f0", "1", },
+  { "AO486.B",        "/media/fat/_Computer/ao486_",             "AO486",        "img", "f0", "1", },
+  { "AO486.C",        "/media/fat/_Computer/ao486_",             "AO486",        "vhd", "f0", "1", },
+  { "AO486.D",        "/media/fat/_Computer/ao486_",             "AO486",        "vhd", "f0", "1", },
+  { "APOGEE",         "/media/fat/_Computer/Apogee_",            "APOGEE",       "rka", "f0", "1", },
+  { "APPLE-I",        "/media/fat/_Computer/Apple-I_",           "Apple-I",      "txt", "f0", "1", },
+  { "APPLE-II",       "/media/fat/_Computer/Apple-II_",          "Apple-II",     "dsk", "f0", "1", },
+  { "AQUARIUS.BIN",   "/media/fat/_Computer/Aquarius_",          "AQUARIUS",     "bin", "f0", "1", },
+  { "AQUARIUS.CAQ",   "/media/fat/_Computer/Aquarius_",          "AQUARIUS",     "caq", "f0", "1", },
+  { "ARCADE",         ROM_IS_THE_CORE,                     "/media/fat/_Arcade", "mra", NULL, "0", },
+  { "ARCHIE.D1",      "/media/fat/_Computer/Archie_",            "ARCHIE",       "vhd", "f0", "1", },
+  { "ARCHIE.F0",      "/media/fat/_Computer/Archie_",            "ARCHIE",       "img", "f0", "1", },
+  { "ARCHIE.F1",      "/media/fat/_Computer/Archie_",            "ARCHIE",       "img", "f0", "1", },
+  { "ASTROCADE",      "/media/fat/_Console/Astrocade_",          "Astrocade",    "bin", "f0", "1", },
+  { "ATARI2600",      "/media/fat/_Console/Atari2600_",          "ATARI2600",    "rom", "f0", "1", },
+  { "ASTROCADE",      "/media/fat/_Console/Astrocade_",          "Astrocade",    "rom", "f0", "1", },
+  { "ATARI5200",      "/media/fat/_Console/Atari5200_",          "ATARI5200",    "rom", "f1", "1", },
+  { "ATARI7800",      "/media/fat/_Console/Atari7800_",          "ATARI7800",    "a78", "f1", "1", },
+  { "ATARI800.CART",  "/media/fat/_Computer/Atari800_",          "ATARI800",     "car", "f0", "1", },
+  { "ATARI800.D1",    "/media/fat/_Computer/Atari800_",          "ATARI800",     "atr", "f0", "1", },
+  { "ATARI800.D2",    "/media/fat/_Computer/Atari800_",          "ATARI800",     "atr", "f0", "1", },
+  { "ATARILYNX",      "/media/fat/_Console/AtariLynx_",          "AtariLynx",    "lnx", "f1", "1", },
+  { "BBCMICRO",       "/media/fat/_Computer/BBCMicro_",          "BBCMicro",     "vhd", "f0", "1", },
+  { "BK0011M",        "/media/fat/_Computer/BK0011M_",           "BK0011M",      "bin", "f0", "1", },
+  { "BK0011M.A",      "/media/fat/_Computer/BK0011M_",           "BK0011M",      "dsk", "f0", "1", },
+  { "BK0011M.B",      "/media/fat/_Computer/BK0011M_",           "BK0011M",      "dsk", "f0", "1", },
+  { "BK0011M.HD",     "/media/fat/_Computer/BK0011M_",           "BK0011M",      "vhd", "f0", "1", },
+  { "C16.CART",       "/media/fat/_Computer/C16_",               "C16",          "bin", "f0", "1", },
+  { "C16.DISK",       "/media/fat/_Computer/C16_",               "C16",          "d64", "f0", "1", },
+  { "C16.TAPE",       "/media/fat/_Computer/C16_",               "C16",          "tap", "f0", "1", },
+  { "C64.CART",       "/media/fat/_Computer/C64_",               "C65",          "crt", "f1", "1", },
+  { "C64.DISK",       "/media/fat/_Computer/C64_",               "C64",          "rom", "f1", "1", },
+  { "C64.PRG",        "/media/fat/_Computer/C64_",               "C64",          "prg", "f1", "1", },
+  { "C64.TAPE",       "/media/fat/_Computer/C64_",               "C64",          "rom", "f1", "1", },
+  { "COCO_2",         "/media/fat/_Computer/CoCo2_",             "CoCo2",        "rom", "f0", "1", },
+  { "COCO_2.CAS",     "/media/fat/_Computer/CoCo2_",             "CoCo2",        "cas", "f0", "1", },
+  { "COCO_2.CCC",     "/media/fat/_Computer/CoCo2_",             "CoCo2",        "ccc", "f0", "1", },
+  { "COLECO",         "/media/fat/_Console/ColecoVision_",       "Coleco",       "col", "f0", "1", },
+  { "COLECO.SG",      "/media/fat/_Console/ColecoVision_",       "Coleco",       "sg",  "f0", "1", },
+  { "CUSTOM",         "/media/fat/_Console/NES_",                "NES",          "nes", "f0", "1", },
+  { "EDSAC",          "/media/fat/_Computer/EDSAC_",             "EDSAC",        "tap", "f0", "1", },
+  { "GALAKSIJA",      "/media/fat/_Computer/Galaksija_",         "Galaksija",    "tap", "f0", "1", },
+  { "GAMEBOY",        "/media/fat/_Console/Gameboy_",            "GameBoy",      "gb",  "f0", "2", },
+  { "GAMEBOY.COL",    "/media/fat/_Console/Gameboy_",            "GameBoy",      "gbc", "f0", "2", },
+  { "GBA",            "/media/fat/_Console/GBA_",                "GBA",          "gba", "f0", "2", },
+  { "GENESIS",        "/media/fat/_Console/Genesis_",            "Genesis",      "gen", "f0", "1", },
+  { "INTELLIVISION",  "/media/fat/_Console/Intellivision_",      "Intellivision","bin", "f0", "1", },
+  { "JUPITER",        "/media/fat/_Computer/Jupiter_",           "Jupiter_",     "ace", "f0", "1", },
+  { "LASER310",       "/media/fat/_Computer/Laser310_",          "Laser310_",    "vz",  "f0", "1", },
+  { "MACPLUS.2",      "/media/fat/_Computer/MacPlus_",           "MACPLUS",      "dsk", "f0", "1", },
+  { "MACPLUS.VHD",    "/media/fat/_Computer/MacPlus_",           "MACPLUS",      "dsk", "f0", "1", },
+  { "MEGACD",         "/media/fat/_Console/MegaCD_",             "MegaCD",       "chd", "s0", "1", },
+  { "MEGACD.CUE",     "/media/fat/_Console/MegaCD_",             "MegaCD",       "cue", "s0", "1", },
+  { "MEGADRIVE",      "/media/fat/_Console/Genesis_",            "Genesis",      "md",  "f0", "1", },
+  { "MEGADRIVE.BIN",  "/media/fat/_Console/Genesis_",            "Genesis",      "bin", "f0", "1", },
+  { "MSX",            "/media/fat/_Computer/MSX_",               "MSX",          "vhd", "f0", "1", },
+  { "NEOGEO",         "/media/fat/_Console/NeoGeo_",             "NeoGeo",       "neo", "f1", "1", },
+  { "NES",            "/media/fat/_Console/NES_",                "NES",          "nes", "f0", "2", },
+  { "NES.FDS",        "/media/fat/_Console/NES_",                "NES",          "fds", "f0", "2", },
+  { "ODYSSEY2",       "/media/fat/_Console/Odyssey2_",           "ODYSSEY2",     "bin", "f0", "1", },
+  { "ORAO",           "/media/fat/_Computer/ORAO_",              "ORAO",         "tap", "f0", "1", },
+  { "ORIC",           "/media/fat/_Computer/Oric_",              "Oric_",        "dsk", "f0", "1", },
+  { "PDP1",           "/media/fat/_Computer/PDP1_",              "PDP1",         "bin", "f0", "1", },
+  { "PET2001",        "/media/fat/_Computer/PET2001_",           "PET2001",      "prg", "f0", "1", },
+  { "PET2001.TAP",    "/media/fat/_Computer/PET2001_",           "PET2001",      "tap", "f0", "1", },
+  { "PSX",            "/media/fat/_Console/PSX_",                "PSX",          "cue", "s1", "1", },
+  { "QL",             "/media/fat/_Computer/QL_",                "QL_",          "mdv", "f0", "1", },
+  { "SAMCOUPE.1",     "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", "f0", "1", },
+  { "SAMCOUPE.2",     "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", "f0", "1", },
+  { "SMS",            "/media/fat/_Console/SMS_",                "SMS",          "sms", "f1", "1", },
+  { "SMS.GG",         "/media/fat/_Console/SMS_",                "SMS",          "gg",  "f2", "1", },
+  { "SNES",           "/media/fat/_Console/SNES_",               "SNES",         "sfc", "f0", "2", },
+  { "SPECIALIST",     "/media/fat/_Computer/Specialist_",        "Specialist_",  "rsk", "f0", "1", },
+  { "SPECIALIST.ODI", "/media/fat/_Computer/Specialist_",        "Specialist_",  "odi", "f0", "1", },
+  { "SPECTRUM",       "/media/fat/_Computer/ZX-Spectrum_",       "Spectrum",     "tap", "f0", "1", },
+  { "SPECTRUM.DSK",   "/media/fat/_Computer/ZX-Spectrum_",       "Spectrum",     "dsk", "f0", "1", },
+  { "SPECTRUM.SNAP",  "/media/fat/_Computer/ZX-Spectrum_",       "Spectrum",     "z80", "f0", "1", },
+  { "SUPERGRAFX",     "/media/fat/_Console/TurboGrafx16_",       "TGFX16",       "sgx", "f0", "1", },
+  { "TGFX16",         "/media/fat/_Console/TurboGrafx16_",       "TGFX16",       "pce", "f0", "1", },
+  { "TGFX16-CD",      "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "chd", "s0", "1", },
+  { "TGFX16-CD.CUE",  "/media/fat/_Console/TurboGrafx16_",       "TGFX16-CD",    "cue", "s0", "1", },
+  { "TI-99_4A",       "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", "f0", "1", },
+  { "TI-99_4A.D",     "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", "f0", "1", },
+  { "TI-99_4A.G",     "/media/fat/_Computer/Ti994a_",            "TI-99_4A",     "bin", "f0", "1", },
+  { "TRS-80",         "/media/fat/_Computer/TRS-80_",            "TRS-80_",      "dsk", "f0", "1", },
+  { "TRS-80.1",       "/media/fat/_Computer/TRS-80_",            "TRS-80_",      "dsk", "f0", "1", },
+  { "TSCONF",         "/media/fat/_Computer/TSConf_",            "TSConf_",      "vhd", "f0", "1", },
+  { "VC4000",         "/media/fat/_Console/VC4000_",             "VC4000",       "bin", "f0", "1", },
+  { "VECTOR06",       "/media/fat/_Computer/Vector-06C_""/core", "VECTOR06",     "rom", "f0", "1", },
+  { "VECTOR06.A",     "/media/fat/_Computer/Vector-06C_""/core", "VECTOR06",     "fdd", "f0", "1", },
+  { "VECTOR06.B",     "/media/fat/_Computer/Vector-06C_""/core", "VECTOR06",     "fdd", "f0", "1", },
+  { "VECTREX",        "/media/fat/_Console/Vectrex_",            "VECTREX",      "vec", "f0", "1", },
+  { "VECTREX.OVR",    "/media/fat/_Console/Vectrex_",            "VECTREX",      "ovr", "f0", "1", },
+  { "VIC20",          "/media/fat/_Computer/VIC20_",             "VIC20",        "prg", "f0", "1", },
+  { "VIC20.CART",     "/media/fat/_Computer/VIC20_",             "VIC20",        "crt", "f0", "1", },
+  { "VIC20.CT",       "/media/fat/_Computer/VIC20_",             "VIC20",        "ct",  "f0", "1", },
+  { "VIC20.DISK",     "/media/fat/_Computer/VIC20_",             "VIC20",        "d64", "f0", "1", },
+  { "WONDERSWAN",     "/media/fat/_Console/WonderSwan_",         "WonderSwan",   "ws",  "f0", "1", },
+  { "WONDERSWAN.COL", "/media/fat/_Console/WonderSwan_",         "WonderSwan",   "wsc", "f0", "1", },
+  { "ZX81",           "/media/fat/_Computer/ZX81_",              "ZX81",         "0",   "f0", "1", },
+  { "ZX81.P",         "/media/fat/_Computer/ZX81_",              "ZX81",         "p",   "f0", "1", },
+  { "ZXNEXT",         "/media/fat/_Computer/ZXNext_",            "ZXNext",       "vhd", "f0", "1", },
 
   // unsupported
-  //{ "AMIGA",          "EEMO" MBCSEQ,        "/media/fat/_Computer/Minimig_",           "/media/fat/games/Amiga",     0, },
-  //{ "ATARIST",        "EEMO" MBCSEQ,        "/media/fat/_Computer/AtariST_",           "/media/fat/games/AtariST",     0, },
-  //{ "AY-3-8500",      0,                    "/media/fat/_Console/AY-3-8500_",          "/media/fat/games/AY-3-8500",    0, },
-  //{ "Altair8800"      , 0 , 0, 0, 0, },
-  //{ "MULTICOMP",      0,                    "/media/fat/_Computer/MultiComp_",         "/media/fat/games/MultiComp",   0, },
-  //{ "MultiComp"       , 0 , 0, 0, 0, },
-  //{ "SHARPMZ",        "EEMO" MBCSEQ,        "/media/fat/_Computer/SharpMZ_",           "/media/fat/games/SharpMZ_",     0, },
-  //{ "X68000"          , 0 , 0, 0, 0, },
+  //{ "AMIGA",          "/media/fat/_Computer/Minimig_",           "/media/fat/games/Amiga",     "", "", ""},
+  //{ "ATARIST",        "/media/fat/_Computer/AtariST_",           "/media/fat/games/AtariST",     "", "", ""},
+  //{ "AY-3-8500",      "/media/fat/_Console/AY-3-8500_",          "/media/fat/games/AY-3-8500",    "", "", ""},
+  //{ "Altair8800"
+  //{ "MULTICOMP",      "/media/fat/_Computer/MultiComp_",         "/media/fat/games/MultiComp",   "", "", ""},
+  //{ "MultiComp"
+  //{ "SHARPMZ",        "/media/fat/_Computer/SharpMZ_",           "/media/fat/games/SharpMZ_",     "", "", ""},
+  //{ "X68000"
 };
 
 int core_wait = 3000; // ms
@@ -449,8 +433,8 @@ static void key_emulator_wait_mount(){
     if (newhash != mnthash) break;
     msleep(500);
   }
-  if (newhash != mnthash) LOG("%s (%ld)\n", "detected a change in the mounting points", newhash);
-  else LOG("%s (%ld)\n", "no changes in the mounting points (timeout)", newhash);
+  if (newhash != mnthash) LOG("%s (%zu)\n", "detected a change in the mounting points", newhash);
+  else LOG("%s (%zu)\n", "no changes in the mounting points (timeout)", newhash);
   mnthash = newhash;
 }
 
@@ -646,6 +630,7 @@ static void  get_core_name(char* corepath, char* out, int size) {
 }
 
 static int cmp_char_ptr_field(const void * a, const void * b) {
+  // This accesses the "id" field of the "system_t" struct
   return strcmp(*(const char**)a, *(const char**)b);
 }
 
@@ -667,7 +652,7 @@ static system_t* get_system(char* corepath, char * name) {
 
 static int load_core(system_t* sys, char* corepath) {
 
-  if (NULL == sys) {
+  if (NULL == sys) { // TODO : remove this check ? sys is  not used !
     PRINTERR("%s\n", "invalid system");
     return -1;
   }
@@ -742,151 +727,6 @@ static void get_base_path(system_t* sys, char* out, int size) {
     if (!findPrefixDir(out, size))
       snprintf(out, size-1, "/media/fat/games/%s", sys->fsid); // fallback
   }
-}
-
-static char* get_rom_extension( system_t* sys){
-  if( !sys) return "";
-  return sys->romext;
-}
-
-static void get_link_path(system_t* sys, const char* filename, char* out, int size) {
-  if (NULL != sys->sublink) {
-    snprintf(out, size-1, "%s", sys->sublink);
-  } else {
-    get_base_path(sys, out, size);
-    int dl = strlen(out);
-    snprintf(out+dl, size-dl-1, "/%s/%s.%s", ROMSUBLINK, filename?filename:MBC_LINK_NAM, get_rom_extension( sys));
-  }
-}
-
-static int create_file(char* path){
-  int result = mkparent(path, 0777);
-  if (result) return result;
-  FILE* f = fopen(path, "ab");
-  if (!f) return errno;
-  return fclose(f);
-}
-
-static int filesystem_bind(const char* source, const char* target) {
-  int err = 0;
-  for(int r = 0; r < 20; r += 1){
-    if (r > 14) LOG("retrying the binding since the mount point is busy (%s -> %s)\n", source, target);
-    if (r != 0) msleep(1000);
-
-    err = mount(source, target, "", MS_BIND | MS_RDONLY | MS_REC, "");
-
-    if (err) err = errno;
-    if (EBUSY != err) break;
-  }
-  return err;
-}
-
-static int filesystem_unbind(const char* path) {
-  int err = 0;
-  for(int r = 0; r < 10; r += 1){
-    if (r > 7) LOG("retrying the unbinding since the mount point is busy (%s)\n", path);
-    if (r != 0) msleep(500);
-
-    err = umount(path);
-
-    if (err) err = errno;
-    if (EBUSY != err) break;
-  }
-  if (EBUSY == err){
-    LOG("%s\n", "trying to unmounting with the DETACH option since nothing else worked");
-    err = umount2(path, MNT_DETACH);
-  }
-  return err;
-}
-
-static int is_empty_file(const char* path){
-  struct stat st;
-  int stat_error = stat(path, &st);
-  if (stat_error) return 0;
-  if (!S_ISREG(st.st_mode)) return 0;
-  if (0 != st.st_size) return 0;
-  return 1;
-}
-
-static int rom_link_default(system_t* sys, char* path) {
-
-  //
-  // We will make some folder and file that will appear in the MiSTer file
-  // selection menu. In order to let this items to be automatically selected by
-  // the emulated key sequence, a folder is created in the rom directory with a
-  // name that places it at very beginning of the list. Moreover such folder
-  // will always contain a single file to be selected.
-  //
-  // We need the auxiliary folder since some cores do not simply sort the item
-  // by the file name, for example the NeoGeo shows the roms by an internal
-  // name. So using a simple file inside the rom directory will not suffice to
-  // make such item automatically selected because we can not predict where it
-  // is placed in the list.
-  //
-  // Moreover, we can not use symbolyc links to link the auxiliary file with
-  // the target rom since the rom directory shown in the MiSTer menu could be
-  // on a filesystem without links support (e.g. vfat in /media/usb0). So we
-  // use bind-mounts.
-  //
-  // The system is cleaned up in rom_unlink_default.
-  //
-
-  char filename[strlen(path)];
-  filename[0] = '\0';
-  strcpy(filename, after_string(path, '/'));
-  char* ext = after_string(filename,'.');
-  if (ext > filename+1) *(ext-1) = '\0';
-
-  char linkpath[PATH_MAX] = {0};
-  get_link_path(sys, filename, linkpath, sizeof(linkpath));
-
-  if (create_file(linkpath)) {
-    PRINTERR("Can not create rom link file or folder %s\n", linkpath);
-    return -1;
-  }
-
-  if (filesystem_bind(path, linkpath)) {
-    PRINTERR("Can not bind %s to %s\n", path, linkpath);
-    return -1;
-  }
-
-  return 0;
-}
-
-static int rom_unlink_default(system_t* sys) {
-
-  //
-  // This must clear up the work done in rom_link_default. First we unbind the rom
-  // file; if it succeeded, we remove the file that was an empty one made just
-  // to have a mount point. The containing folder then is removed.  If
-  // something goes wrong, the auxiliary folder and file may remain in the
-  // filesystem. To mitigate this issue we retry critical operations multiple
-  // times. Moreover we unmount and remove any file in the auxiliary folder so
-  // a successive mbc invocation have chance to clean up entities created in
-  // previous failiing invocations.
-  //
-
-  char aux_path[PATH_MAX] = {0};
-
-  get_link_path(sys, NULL, aux_path, sizeof(aux_path));
-  path_parentize(aux_path, 0);
-
-  struct dirent* ep = NULL;
-  DIR* dp = opendir(aux_path);
-  if (dp != NULL) {
-    while (0 != (ep = readdir (dp))){
-      if (!strcmp(".",ep->d_name) || !strcmp("..",ep->d_name))
-        continue;
-      char p[PATH_MAX] = {0};
-      snprintf(p, sizeof(p), "%s/%s", aux_path, ep->d_name);
-      if (!filesystem_unbind(p) && is_empty_file(p))
-        remove(p);
-    }
-  }
-
-  rmdir(aux_path); // No issue if error
-
-  return 0;
 }
 
 char* search_in_string(const char* pattern_start, const char* data, size_t *size){
@@ -970,195 +810,11 @@ int get_relative_path_to_root(int skip, const char* path, char* out, size_t len)
   return 0;
 }
 
-int cue_rebase(char* source, char* destination){
-
-  //
-  // To rebase a .cue we need to substitue all the line like the following:
-  //   FILE "filename.bin" BINARY
-  //
-  // We suppose that between quote there is just a filename that normally is
-  // located in the same directory of the .cue. The MiSTer handles this by
-  // adding in front of the filename the path to the .cue containing folder:
-  //   /path/to/original_cue_folder/filename.bin
-  //
-  // If we copy the file without modification in a new folder, the MiSTer
-  // wil try to access
-  //   /path/to/new_cue_folder/filename.bin
-  //
-  // To fake such system, we replace the original line with
-  //   FILE "../../../path/to/original_cue_folder/filename.bin" BINARY
-  //
-  // so that the MiSTer will search for
-  //   /path/to/new_cue_folder/../../../path/to/original_cue_folder/filename.bin
-  //
-  // There must be enought "../" to reach the root folder starting from the
-  // new_cue_folder one. In this way
-  //   /path/to/original_cue_folder
-  //
-  // is simply the absolute path to the auxiliary directory where the new .cue
-  // file is placed
-  //
-
-  FILE* in = fopen(source, "r");
-  if(!in){
-    PRINTERR("Can not open %s\n", source);
-    return -1;
-  }
-
-  char inc[4096]; inc[0] = '\0';
-  size_t len = fread(inc, 1, sizeof( inc), in);
-  fclose(in);
-
-  FILE* out = fopen(destination, "w");
-  if(!out){
-    PRINTERR( "Can not open %s\n", destination);
-    return -2;
-  }
-
-  char dirpath[PATH_MAX];
-  strncpy(dirpath, destination, sizeof( dirpath));
-  get_relative_path_to_root(1, dirpath, dirpath, sizeof( dirpath));
-  int cat = strlen(dirpath)-1;
-  get_absolute_dir_name(source, dirpath+cat, sizeof( dirpath)-cat-1);
-  path_parentize(dirpath, 1);
-
-  char* curr = inc;
-  while(0 < len){
-    size_t size = 0;
-    char* next = search_in_string("FILE \"", curr, &size);
-    if(NULL == next){
-      fwrite(curr, 1, len, out);
-      break;
-    }else{
-      fwrite(curr, 1, next - curr, out);
-      fwrite("FILE \"", 1, sizeof("FILE \"")-1, out);
-      fwrite(dirpath, 1, strlen(dirpath), out);
-      len -= next - curr + size;
-      curr = next + size - 1;
-    }
-  }
-
-  fclose(out);
-  return 0;
-}
-
-static int rom_link_cue(system_t* sys, char* path) {
-
-  //
-  // Look at rom_link_default for the common case overview.
-  // The .cue is handled in a different way since the MiSTer may need to locate
-  // more than one file. So we simply generate a new .cue in the auxiliary
-  // directory that is a copy of the source one, except for the paths that
-  // are rebased in the new destination folder (look at rebase_cue for more
-  // detaiks).
-  //
-  // The system is cleaned up by the rom_unlink_cue function.
-  // 
-
-  char filename[strlen( path)];
-  filename[0] = '\0';
-  strcpy(filename, after_string(path, '/'));
-  char* ext = after_string(filename,'.');
-  if (ext > filename+1) *(ext-1) = '\0';
-
-  char linkpath[PATH_MAX] = {0};
-  get_link_path(sys, filename, linkpath, sizeof(linkpath));
-
-  if (create_file(linkpath)) {
-    PRINTERR("Can not create rom link file or folder %s\n", linkpath);
-    return -1;
-  }
-
-  if (cue_rebase(path, linkpath)) {
-    return -1;
-  }
-
-  return 0;
-}
-
 int stricmp(const char* a, const char* b) {
   for (; tolower(*a) == tolower(*b); a += 1, b += 1)
     if (*a == '\0')
       return 0;
   return tolower(*a) - tolower(*b);
-}
-
-static int rom_unlink_cue( system_t* sys) {
-
-  //
-  // This will clear the work done in the rom_link_cue function.
-  // We simply delete all the .cue in the auxiliary directory, and the directory
-  // itself. Look at rom_unlink_default for details on what can happen if
-  // something goes wrong.
-  //
-
-  char aux_path[ PATH_MAX] = {0};
-
-  get_link_path( sys, NULL, aux_path, sizeof(aux_path));
-  path_parentize( aux_path, 0);
-
-  struct dirent* ep = NULL;
-  DIR* dp = opendir( aux_path);
-  if (dp != NULL) {
-    while (0 != ( ep = readdir( dp))){
-      if (!strcmp( ".", ep->d_name) || !strcmp( "..", ep->d_name))
-        continue;
-      char p[ PATH_MAX] = {0};
-      snprintf( p, sizeof(p), "%s/%s", aux_path, ep->d_name);
-      if (!stricmp(get_rom_extension(sys), after_string(ep->d_name, '.')))
-        remove( p);
-    }
-  }
-
-  rmdir( aux_path); // No issue if error
-
-  return 0;
-}
-
-static int rom_link( system_t* sys, char* path) {
-  // The defauld link mechanism is in rom_link_default. Some files need a custom
-  // one, so this is a dispatcher.
-
-  if( !strcmp( get_rom_extension(sys), "cue")){
-    return rom_link_cue( sys, path);
-  }else{
-    return rom_link_default( sys, path);
-  }
-}
-
-static int rom_unlink( system_t* sys) {
-  // The defauld link mechanism is in rom_unlink_default. Some files need a custom
-  // one, so this is a dispatcher.
-
-  if( !strcmp( get_rom_extension(sys), "cue")){
-    return rom_unlink_cue( sys);
-  }else{
-    return rom_unlink_default( sys);
-  }
-}
-
-static int emulate_system_sequence(system_t* sys) {
-  if (NULL == sys) {
-    return -1;
-  }
-  return emulate_sequence(sys->menuseq);
-}
-
-static int load_rom(system_t* sys, char* rom) {
-  int err;
-
-  err = rom_link(sys, rom);
-  if (err) PRINTERR("%s\n", "Can not bind the rom");
-
-  if (!err) {
-    err = emulate_system_sequence(sys);
-    if (err) PRINTERR("%s\n", "Error during key emulation");
-  }
-
-  err = rom_unlink(sys);
-  if (err) PRINTERR("%s\n", "Can not unbind the rom");
-
-  return err;
 }
 
 static int has_ext(char* name, char* ext){
@@ -1212,11 +868,225 @@ static int list_core(){
   return 0;
 }
 
+static int has_mgl_support(system_t* sys) {
+  if (!strcmp(ROM_IS_THE_CORE, sys->core))
+    return 0;
+  return 1;
+}
+
+static int rebase_canon_path(const char* base, const char* path, char* buf, size_t len) {
+
+  size_t blen = strlen(base);
+
+  // Special case: path is inside base
+  if (!strncmp(base, path, blen)){
+    return 0> snprintf(buf, len, "%s", path+blen+1);
+  }
+
+  // Find common prefix
+  size_t prefix = 0;
+  for (size_t c = 0; base[c] == path[c] && '\0' != base[c] && '\0' != path[c]; c += 1)
+    prefix += 1;
+
+  // Expand the right number of ../
+  for (int c = 0; c < blen - prefix; c+=1){
+    if ('/' == base[prefix + c -1]) {
+      if (0> snprintf(buf, len, "../")){
+        return -1;
+      }
+      buf += 3;
+      len -= 3;
+    }
+  }
+
+  // Final path part
+  return 0> snprintf(buf, len, "%s", path+prefix);
+}
+
+// Note: path and out may point to the same memory.
+static int reduce_path(const char* path, char* out, size_t len) {
+  size_t d = 0;
+
+  for (size_t s = 0; '\0' != path[s]; s += 1){
+    if (d >= len) break;
+    out[d] = path[s];
+    if (0){
+
+    // simplify '//' occurences
+    }else if (0
+    ||(d >= 1 && '/' == out[d-1] && '/' == out[d])
+    ){
+      d -= 1;
+
+    // simplify './' occurences
+    }else if (0
+    ||(d == 1 && '.' == out[d-1] && '/' == out[d])
+    ||(d >  1 && '/' == out[d-2] && '.' == out[d-1] && '/' == out[d])
+    ){
+      d -= 2;
+
+    // simplify '../' occurences
+    }else if (0
+    ||(d == 2 && '.' == out[d-2] && '.' == out[d-1] && '/' == out[d])
+    ||(d >  2 && '/' == out[d-3] && '.' == out[d-2] && '.' == out[d-1] && '/' == out[d])
+    ){
+      d -= 4;
+      if (d < 0) d = 0;
+      for (; d > 0 && '/' != out[d]; d -= 1);
+    }
+
+    d += 1;
+  }
+  out[d] = '\0';
+  if (d-1 < len && '/' == out[d-1]) out[d-1] = '\0';
+  return 0;
+}
+
+static int rebase_path(const char* base, const char* path, char* buf, size_t len) {
+
+  char* pwd = getenv("PWD");
+  if (!pwd) return -1;
+  size_t pwdl = strlen(pwd);
+
+  size_t basel = strlen(base)+pwdl+2;
+  char rbase[basel];
+  if (0> snprintf(rbase, basel, "%s%s%s",
+                  '/' != base[0] ? pwd : "",
+                  '/' != base[0] ? "/" : "",
+                  base)
+  ) return -1;
+
+  size_t pathl = strlen(path)+pwdl+2;
+  char rpath[pathl];
+  if (0> snprintf(rpath, pathl, "%s%s%s",
+                  '/' != path[0] ? pwd : "",
+                  '/' != path[0] ? "/" : "",
+                  path)
+  ) return -1;
+
+  int res;
+  res = reduce_path(rbase, rbase, sizeof(rbase));
+  if (res) return res;
+  res = reduce_path(rpath, rpath, sizeof(rpath));
+  if (res) return res;
+  return rebase_canon_path(rbase, rpath, buf, len);
+}
+
+static int write_mgl_wrapper(FILE* out, char* corepath, char* rom, char* delay, char typ, char* index) {
+
+  if (0> fprintf( out, "<mistergamedescription>\n <rbf>%s", corepath)){
+    PRINTERR("%s", "error while writing mgl file\n");
+    return -1;
+  }
+
+  if (0> fprintf( out, "</rbf>\n <file path=\"%s", rom)){
+    PRINTERR("%s", "error while writing mgl file\n");
+    return -1;
+  }
+
+  if (0> fprintf( out,
+                  "\" delay=\"%s\" type=\"%c\" index=\"%s\" />\n</mistergamedescription>\n",
+                  delay, typ, index)){
+    PRINTERR("%s", "error while writing mgl file\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+static int generate_mgl(system_t* sys, char* corepath, char* rompath, FILE* out) {
+  char base[PATH_MAX];
+  char rcore[PATH_MAX];
+  char rrom[PATH_MAX];
+
+  if (NULL == sys) {
+    PRINTERR("%s\n", "invalid system");
+    return -1;
+  }
+
+  char *opt = sys->loadmode;
+  if (!has_mgl_support(sys)) {
+    PRINTERR("can not generate mgl for '%s' system - plese load the core directly\n", sys->id);
+    return -1;
+  }
+
+  if (NULL == corepath)
+    corepath = sys->core;
+
+  if (rebase_path("/media/fat", corepath, rcore, sizeof(rcore))){
+    PRINTERR("can not handle folder %s\n", corepath);
+    return -1;
+  }
+
+  // remove extension from core path
+  for (int c = strlen(rcore)-1; c >= 0; c -= 1){
+    if ('/' == rcore[c]) break;
+    if ('.' == rcore[c]) {
+      rcore[c] = '\0';
+      break;
+    }
+  }
+
+  get_base_path(sys, base, sizeof(base));
+
+  if (rebase_path(base, rompath, rrom, sizeof(rrom))){
+    PRINTERR("can not handle folder %s\n", rompath);
+    return -1;
+  }
+
+  return write_mgl_wrapper(out, rcore, rrom,
+                           sys->delay ? sys->delay : "0",
+                           opt[0],
+                           '\0' == opt[0] ? opt : opt+1);
+}
+
+static int generate_mgl_in_path(system_t* sys, char* corepath, char* rom, const char* outpath) {
+
+  int result = 0;
+
+  if (mkparent(outpath, 0777)){
+    PRINTERR("can not create mgl folder at %s\n", outpath);
+    return -1;
+  }
+
+  FILE* mgl = fopen(outpath, "wb");
+  if (0 != mgl) {
+    result = generate_mgl(sys, corepath, rom, mgl);
+    fclose(mgl);
+  }
+
+  if (result)
+    PRINTERR("can not generate mgl file at %s\n", outpath);
+  return result;
+}
+
+static int load_core_directly(system_t* sys, char* path){
+  char rpath[PATH_MAX];
+  if (NULL == sys)
+    return -1;
+  if (rebase_path(sys->core, path, rpath, sizeof(rpath)))
+    return -1;
+  return load_core(sys, rpath);
+}
+
+static int load_core_and_rom(system_t* sys, char* corepath, char* rom) {
+
+  if (!has_mgl_support(sys))
+    return load_core_directly(sys, rom);
+
+  if (generate_mgl_in_path(sys, corepath, rom, MGL_PATH))
+    return -1;
+  return load_core(sys, MGL_PATH);
+}
+
 static int load_rom_autocore(system_t* sys, char* rom) {
 
   if (NULL == sys) {
     return -1;
   }
+
+  if (!has_mgl_support(sys))
+    return load_core_directly(sys, rom);
 
   int plen = 64 + strlen(sys->core);
   char corepath[plen];
@@ -1226,32 +1096,7 @@ static int load_rom_autocore(system_t* sys, char* rom) {
     return -1;
   }
 
-  int ret = load_core(sys, corepath);
-  if (0 > ret) {
-    PRINTERR("%s\n", "Can not load the core");
-    return -1;
-  }
-
-  msleep(core_wait);
-
-  return load_rom(sys, rom);
-}
-
-static int load_core_and_rom(system_t* sys, char* corepath, char* rom) {
-
-  if (NULL == sys) {
-    return -1;
-  }
-
-  int ret = load_core(sys, corepath);
-  if (0 > ret) {
-    PRINTERR("%s\n", "Can not load the core");
-    return -1;
-  }
-
-  msleep(core_wait);
-
-  return load_rom(sys, rom);
+  return load_core_and_rom(sys, corepath, rom);
 }
 
 struct cmdentry {
@@ -1277,7 +1122,7 @@ int list_content_for(system_t* sys){
   if (dp != NULL) {
     while (0 != (ep = readdir (dp))){
 
-      if (has_ext(ep->d_name, get_rom_extension( sys))){
+      if (has_ext(ep->d_name, sys->romext)){
         something_found = 1;
         printf("%s %s/%s\n", sys->id, romdir, ep->d_name);
       }
@@ -1285,7 +1130,7 @@ int list_content_for(system_t* sys){
     closedir(dp);
   }
   if (!something_found) {
-    //printf("#%s no '.%s' files found in %s\n", sys->id, get_rom_extension( sys), romdir);
+    //printf("#%s no '.%s' files found in %s\n", sys->id, sys->romext, romdir);
   }
   return something_found;
 }
@@ -1335,19 +1180,17 @@ static void cmd_exit(int argc, char** argv)         { exit(0); }
 static void cmd_stream_mode(int argc, char** argv)  { stream_mode(); }
 static void cmd_load_core(int argc, char** argv)    { if(checkarg(1,argc))load_core(get_system(argv[1],NULL),argv[1]); }
 static void cmd_load_core_as(int argc, char** argv) { if(checkarg(2,argc))load_core(get_system(NULL,argv[1]),argv[2]); }
-static void cmd_load_rom(int argc, char** argv)     { if(checkarg(2,argc))load_rom(get_system(NULL,argv[1]),argv[2]); }
 static void cmd_list_core(int argc, char** argv)    { list_core(); }
 static void cmd_rom_autocore(int argc, char** argv) { if(checkarg(2,argc))load_rom_autocore(get_system(NULL,argv[1]),argv[2]); }
 static void cmd_load_all(int argc, char** argv)     { if(checkarg(2,argc))load_core_and_rom(get_system(argv[1],NULL),argv[1],argv[2]); }
 static void cmd_load_all_as(int argc, char** argv)  { if(checkarg(3,argc))load_core_and_rom(get_system(NULL,argv[1]),argv[2],argv[3]); }
-static void cmd_rom_link(int argc, char** argv)     { if(checkarg(2,argc))rom_link(get_system(NULL,argv[1]),argv[2]); }
 static void cmd_raw_seq(int argc, char** argv)      { if(checkarg(1,argc))emulate_sequence(argv[1]); }
-static void cmd_select_seq(int argc, char** argv)   { if(checkarg(1,argc))emulate_system_sequence(get_system(NULL,argv[1])); }
-static void cmd_rom_unlink(int argc, char** argv)   { if(checkarg(1,argc))rom_unlink(get_system(NULL,argv[1])); }
 static void cmd_list_content(int argc, char** argv) { list_content(); }
 static void cmd_list_rom_for(int argc, char** argv) { if(checkarg(1,argc))list_content_for(get_system(NULL,argv[1])); }
 static void cmd_wait_input(int argc, char** argv)   { if(checkarg(1,argc))monitor_user_input(1,argv[1]); }
 static void cmd_catch_input(int argc, char** argv)  { if(checkarg(1,argc))monitor_user_input(0,argv[1]); }
+static void cmd_mgl_gen(int argc, char** argv)      { if(checkarg(3,argc))generate_mgl(get_system(NULL,argv[1]),argv[2],argv[3],stdout); }
+static void cmd_mgl_gen_auto(int argc, char** argv) { if(checkarg(2,argc))generate_mgl(get_system(NULL,argv[1]),NULL,argv[2],stdout); }
 //
 struct cmdentry cmdlist[] = {
   //
@@ -1365,11 +1208,9 @@ struct cmdentry cmdlist[] = {
   {"load_core"    , cmd_load_core    , } ,
   {"load_core_as" , cmd_load_core_as , } ,
   {"load_rom"     , cmd_rom_autocore , } ,
-  {"load_rom_only", cmd_load_rom     , } ,
+  {"mgl_gen"      , cmd_mgl_gen      , } ,
+  {"mgl_gen_auto" , cmd_mgl_gen_auto , } ,
   {"raw_seq"      , cmd_raw_seq      , } ,
-  {"rom_link"     , cmd_rom_link     , } ,
-  {"rom_unlink"   , cmd_rom_unlink   , } ,
-  {"select_seq"   , cmd_select_seq   , } ,
   {"stream"       , cmd_stream_mode  , } ,
   {"wait_input"   , cmd_wait_input   , } ,
 };
@@ -1449,25 +1290,10 @@ static void read_options(int argc, char* argv[]) {
     if (NULL != val && val[0] != '\0') custom_system->fsid = strdup(val);
     val = getenv("MBC_CUSTOM_ROM_EXT");
     if (NULL != val && val[0] != '\0') custom_system->romext = strdup(val);
-
-    val = getenv("MBC_CUSTOM_LINK");
-    int custom_link = 0;
-    if (NULL != val && val[0] != '\0') {
-      custom_link = 1;
-      custom_system->sublink = strdup(val);
-    }
-
-    val = getenv("MBC_CUSTOM_SEQUENCE");
-    if (NULL != val && val[0] != '\0') {
-      int siz = strlen(val);
-      char* seq = malloc(siz + strlen(MBCSEQ) +1);
-      if (seq) {
-        strcpy(seq, val);
-        if (!custom_link)
-          strcpy(seq + siz, MBCSEQ);
-      }
-      custom_system->menuseq = seq;
-    }
+    val = getenv("MBC_CUSTOM_DELAY");
+    if (NULL != val && val[0] != '\0') custom_system->delay = strdup(val);
+    val = getenv("MBC_CUSTOM_MODE");
+    if (NULL != val && val[0] != '\0') custom_system->loadmode = strdup(val);
   }
 
   val = getenv("MBC_CORE_WAIT");
