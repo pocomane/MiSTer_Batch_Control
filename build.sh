@@ -4,7 +4,7 @@ set -x
 
 if [ "$BUILD_MODE" = "test" ] ; then
   set -e
-  ./build/release/mbc.exe
+  ./build/release/mbc
   exit 0
 fi
 
