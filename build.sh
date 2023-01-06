@@ -2,6 +2,12 @@
 
 set -x
 
+if [ "$BUILD_MODE" = "test" ] ; then
+  set -e
+  ./build/release/mbc.exe
+  exit 0
+fi
+
 die(){
   echo "ERROR"
   exit -1
@@ -34,5 +40,8 @@ cd hook/expose ||die
 ln -s ../../mbc __unnamed__ ||die
 cd -
 tar -czf mbc.tar.gz mbc hook/expose/__unnamed__
+mkdir release
+cp mbc release/
+cp mbc.tar.gz release/
 cd ..
 

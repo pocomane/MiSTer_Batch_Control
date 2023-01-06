@@ -1,0 +1,79 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+
+  raspberry-build:
+    runs-on: ubuntu-22.04
+    env:
+      BUILD_MODE: build
+      TARGET_ARCH: armhf-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build
+        run: |
+          chmod u+x ./build.sh
+          ./build.sh
+
+      - name: Store artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "out-raspberry" #destination
+          path: build/release/* #source
+
+  raspberry-test:
+    needs: [raspberry-build]
+    runs-on: ubuntu-22.04
+    env:
+      BUILD_MODE: test
+      TARGET_ARCH: armhf-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Download Raspberry artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: out-raspberry #source
+          path: build/release #destination
+
+      - name: Test
+        uses: pguyot/arm-runner-action@v2
+        with:
+          commands: |
+            chmod u+x ./build.sh
+            ./build.sh
+
+  ### Release
+
+  release:
+    if: github.event_name == 'push'
+    needs: [raspberry-test]
+    runs-on: ubuntu-22.04
+
+    steps:
+
+      - name: Download Raspberry artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: out-raspberry #source
+          path: release #destination
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: Automatic Release (${{ github.event.head_commit.timestamp }})
+          tag_name: release.${{ github.sha }}
+          files: release/*
+
