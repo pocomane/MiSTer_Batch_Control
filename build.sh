@@ -4,6 +4,7 @@ set -x
 
 if [ "$BUILD_MODE" = "test" ] ; then
   set -e
+  chmod ugo+x ./build/release/mbc
   ./build/release/mbc
   exit 0
 fi
