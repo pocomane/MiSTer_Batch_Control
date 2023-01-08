@@ -889,7 +889,7 @@ static int rebase_canon_path(const char* base, const char* path, char* buf, size
   // Find common prefix
   size_t prefix = 0;
   for (size_t c = 0; base[c] == path[c] && '\0' != base[c] && '\0' != path[c]; c += 1)
-    prefix += 1;
+    if (base[c] == '/') prefix = c + 1;
 
   // Expand the right number of ../
   for (int c = 0; c < blen - prefix; c+=1){
@@ -972,6 +972,7 @@ static int rebase_path(const char* base, const char* path, char* buf, size_t len
   if (res) return res;
   res = reduce_path(rpath, rpath, sizeof(rpath));
   if (res) return res;
+
   return rebase_canon_path(rbase, rpath, buf, len);
 }
 
