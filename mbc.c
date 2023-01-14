@@ -361,6 +361,7 @@ static system_t system_list[] = {
   { "S32X",           "/media/fat/_Console/S32X_",               "S32X",         "32x", "f0", "1", },
   { "SAMCOUPE.1",     "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", "f0", "1", },
   { "SAMCOUPE.2",     "/media/fat/_Computer/SAMCoupe_",          "SAMCOUPE",     "img", "f0", "1", },
+  { "SATURN",         "/media/fat/_Console/Saturn",              "Saturn",       "cue", "s0", "1", },
   { "SMS",            "/media/fat/_Console/SMS_",                "SMS",          "sms", "f1", "1", },
   { "SMS.GG",         "/media/fat/_Console/SMS_",                "SMS",          "gg",  "f2", "1", },
   { "SNES",           "/media/fat/_Console/SNES_",               "SNES",         "sfc", "f0", "2", },
